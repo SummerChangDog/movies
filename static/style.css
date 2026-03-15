@@ -271,7 +271,30 @@ header {
 
 .platform-logo {
     height: 30px;
-    width: auto;
+    width: 60px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 14px;
+    border-radius: 4px;
+}
+
+.platform-logo.douban-logo {
+    background-color: #00B51D;
+    color: white;
+}
+
+.platform-logo.imdb-logo {
+    background-color: #F5C518;
+    color: black;
+}
+
+.platform-logo.rt-logo {
+    background-color: #FA320A;
+    color: white;
+    width: 30px;
+    border-radius: 50%;
 }
 
 .rating-header h3 {

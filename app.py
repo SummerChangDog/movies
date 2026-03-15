@@ -76,8 +76,64 @@ def search_movie():
 
 def get_movie_data(movie_name):
     """获取电影数据"""
+    # 电影名称中英文映射（可以扩展这个字典）
+    movie_name_mapping = {
+        # 英文 -> 中文
+        'The Shining': '闪灵',
+        'The Shawshank Redemption': '肖申克的救赎',
+        'Inception': '盗梦空间',
+        'Interstellar': '星际穿越',
+        'The Dark Knight': '蝙蝠侠：黑暗骑士',
+        'The Godfather': '教父',
+        'Forrest Gump': '阿甘正传',
+        'The Matrix': '黑客帝国',
+        'Titanic': '泰坦尼克号',
+        'Avatar': '阿凡达',
+        'The Terminator': '终结者',
+        'Pulp Fiction': '低俗小说',
+        'Fight Club': '搏击俱乐部',
+        'The Lord of the Rings': '指环王',
+        'Star Wars': '星球大战',
+        # 中文 -> 英文（反向映射）
+        '闪灵': 'The Shining',
+        '肖申克的救赎': 'The Shawshank Redemption',
+        '盗梦空间': 'Inception',
+        '星际穿越': 'Interstellar',
+        '蝙蝠侠：黑暗骑士': 'The Dark Knight',
+        '教父': 'The Godfather',
+        '阿甘正传': 'Forrest Gump',
+        '黑客帝国': 'The Matrix',
+        '泰坦尼克号': 'Titanic',
+        '阿凡达': 'Avatar',
+        '终结者': 'The Terminator',
+        '低俗小说': 'Pulp Fiction',
+        '搏击俱乐部': 'Fight Club',
+        '指环王': 'The Lord of the Rings',
+        '星球大战': 'Star Wars'
+    }
+    
+    # 检测是否是中文
+    def contains_chinese(text):
+        for char in text:
+            if '\u4e00' <= char <= '\u9fff':
+                return True
+        return False
+    
+    is_chinese = contains_chinese(movie_name)
+    omdb_search_name = movie_name
+    douban_search_name = movie_name
+    
+    # 如果是中文，尝试找到对应的英文名用于OMDb搜索
+    if is_chinese and movie_name in movie_name_mapping:
+        omdb_search_name = movie_name_mapping[movie_name]
+        print(f"中文搜索，转换为英文: {movie_name} -> {omdb_search_name}")
+    # 如果是英文，尝试找到对应的中文名用于豆瓣搜索
+    elif not is_chinese and movie_name in movie_name_mapping:
+        douban_search_name = movie_name_mapping[movie_name]
+        print(f"英文搜索，准备豆瓣中文名: {movie_name} -> {douban_search_name}")
+    
     # 首先通过OMDb API搜索电影
-    omdb_data = search_omdb(movie_name)
+    omdb_data = search_omdb(omdb_search_name)
     
     if not omdb_data:
         return None
@@ -108,8 +164,8 @@ def get_movie_data(movie_name):
     if rt_data:
         movie_info['rottenTomatoes'] = rt_data
     
-    # 豆瓣评分（使用模拟数据或豆瓣API）
-    douban_data = get_douban_rating(movie_name, omdb_data.get('imdbID'))
+    # 豆瓣评分（使用转换后的名称搜索）
+    douban_data = get_douban_rating(douban_search_name, movie_name, omdb_data.get('imdbID'))
     if douban_data:
         movie_info['douban'] = douban_data
     
@@ -216,6 +272,11 @@ def extract_rotten_tomatoes(omdb_data):
             rt_data['critic'] = rating.get('Value', '').replace('%', '')
             break
     
+    # 提取观众评分（如果有）
+    # OMDb API可能在tomatoUserMeter字段返回观众评分
+    if omdb_data.get('tomatoUserMeter'):
+        rt_data['audience'] = omdb_data.get('tomatoUserMeter')
+    
     # 如果有Metascore，可以作为参考
     if omdb_data.get('Metascore') and omdb_data.get('Metascore') != 'N/A':
         # Metascore通常与专业评分相关
@@ -225,14 +286,23 @@ def extract_rotten_tomatoes(omdb_data):
     
     return rt_data if rt_data else None
 
-def get_douban_rating(movie_name, imdb_id=None):
-    """获取豆瓣评分"""
+def get_douban_rating(search_name, original_name, imdb_id=None):
+    """获取豆瓣评分
+    
+    Args:
+        search_name: 用于豆瓣搜索的名称（可能是中文）
+        original_name: 用户原始输入的名称
+        imdb_id: IMDb ID（可选）
+    """
     try:
+        print(f"Getting Douban rating for: {search_name} (original: {original_name})")
+        
         # 创建豆瓣爬虫实例
         scraper = DoubanMovieScraper(delay_enable=True)
         
-        # 获取电影评分信息
-        rating_info = scraper.get_movie_rating_only(movie_name)
+        # 首先尝试使用转换后的名称搜索
+        rating_info = scraper.get_movie_rating_only(search_name)
+        print(f"Douban rating info for '{search_name}': {rating_info}")
         
         if rating_info and rating_info['score'] > 0:
             return {
@@ -240,20 +310,12 @@ def get_douban_rating(movie_name, imdb_id=None):
                 'votes': rating_info['votes']
             }
         
-        # 如果直接搜索没有结果，尝试不同的搜索词
-        # 例如，如果是英文名，尝试常见的中文译名
-        alternative_names = {
-            'The Shawshank Redemption': '肖申克的救赎',
-            'Inception': '盗梦空间',
-            'Interstellar': '星际穿越',
-            'The Dark Knight': '蝙蝠侠：黑暗骑士',
-            'The Godfather': '教父',
-            'Forrest Gump': '阿甘正传'
-        }
-        
-        if movie_name in alternative_names:
-            alt_name = alternative_names[movie_name]
-            rating_info = scraper.get_movie_rating_only(alt_name)
+        # 如果转换后的名称没找到，且与原始名称不同，尝试用原始名称
+        if search_name != original_name:
+            print(f"Trying with original name: {original_name}")
+            rating_info = scraper.get_movie_rating_only(original_name)
+            print(f"Douban rating info for '{original_name}': {rating_info}")
+            
             if rating_info and rating_info['score'] > 0:
                 return {
                     'score': str(rating_info['score']),
