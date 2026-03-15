@@ -1,10 +1,10 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response
 from flask_cors import CORS
 import requests
 import os
 from datetime import datetime, timedelta
 import json
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 from config import Config, OMDB_API_KEY
 from douban_movie_scraper import DoubanMovieScraper
 from movie_translator import get_omdb_name, get_douban_name
@@ -34,6 +34,42 @@ def index():
 def test_api():
     """测试API端点"""
     return jsonify({'status': 'API is working!'})
+
+@app.route('/api/proxy-image')
+def proxy_image():
+    """
+    图片代理接口，用于绕过豆瓣防盗链。
+    豆瓣 CDN 要求 Referer 为 douban.com，浏览器直接加载会被拒绝。
+    本接口由服务器携带正确 Referer 取回图片后转发给浏览器。
+    用法: /api/proxy-image?url=<encoded_image_url>
+    """
+    img_url = request.args.get('url', '').strip()
+    if not img_url:
+        return jsonify({'error': '缺少 url 参数'}), 400
+
+    # 安全校验：只允许代理豆瓣图片域名
+    allowed_hosts = ('img1.doubanio.com', 'img2.doubanio.com',
+                     'img3.doubanio.com', 'img9.doubanio.com',
+                     'img.doubanio.com')
+    from urllib.parse import urlparse
+    parsed = urlparse(img_url)
+    if not any(parsed.netloc.endswith(h) for h in allowed_hosts):
+        return jsonify({'error': '仅支持代理豆瓣图片'}), 403
+
+    try:
+        headers = {
+            'Referer': 'https://movie.douban.com/',
+            'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                           'AppleWebKit/537.36 (KHTML, like Gecko) '
+                           'Chrome/120.0.0.0 Safari/537.36'),
+        }
+        resp = requests.get(img_url, headers=headers, timeout=10, stream=True)
+        resp.raise_for_status()
+        content_type = resp.headers.get('Content-Type', 'image/jpeg')
+        return Response(resp.content, content_type=content_type)
+    except Exception as e:
+        print(f"[ProxyImage] 代理图片失败: {e}")
+        return jsonify({'error': '图片获取失败'}), 502
 
 @app.route('/api/search', methods=['POST'])
 def search_movie():
@@ -127,7 +163,8 @@ def get_movie_data(movie_name):
                 if final_poster:
                     print(f"[Poster] 豆瓣无海报，使用 OMDb 海报")
             else:
-                final_poster = douban_poster
+                # 豆瓣图片需要经过代理才能在浏览器中正常显示
+                final_poster = wrap_douban_poster(douban_poster)
 
             movie_info = {
                 'title': douban_full.get('title', movie_name) if douban_full else movie_name,
@@ -210,7 +247,8 @@ def get_movie_data(movie_name):
             for cand in poster_candidates:
                 douban_info = scraper.search_movie(cand)
                 if douban_info and douban_info.get('poster'):
-                    movie_info['poster'] = douban_info['poster']
+                    # 豆瓣图片需要经过代理才能在浏览器中正常显示
+                    movie_info['poster'] = wrap_douban_poster(douban_info['poster'])
                     print(f"[Poster] OMDb 无海报，使用豆瓣海报（搜索词：{cand}）")
                     break
         except Exception as e:
@@ -405,6 +443,23 @@ def get_douban_full_info(search_name, original_name):
     except Exception as e:
         print(f"获取豆瓣完整信息时出错: {str(e)}")
         return None
+
+def wrap_douban_poster(url: str) -> str:
+    """
+    若 URL 是豆瓣图片域名，则将其转为本地代理地址，
+    避免浏览器因防盗链无法直接加载豆瓣图片。
+    非豆瓣 URL 原样返回。
+    """
+    if not url:
+        return url
+    douban_hosts = ('img1.doubanio.com', 'img2.doubanio.com',
+                    'img3.doubanio.com', 'img9.doubanio.com',
+                    'img.doubanio.com')
+    from urllib.parse import urlparse, urlencode
+    parsed = urlparse(url)
+    if any(parsed.netloc.endswith(h) for h in douban_hosts):
+        return '/api/proxy-image?' + urlencode({'url': url})
+    return url
 
 def parse_votes(votes_str):
     """解析投票数字符串"""
