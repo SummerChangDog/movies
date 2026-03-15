@@ -111,9 +111,56 @@ class RTScraper:
             resp.raise_for_status()
             text = resp.text
 
+            # 检查是否被重定向到404或错误页
+            if '<title>Error' in text or 'Page Not Found' in text:
+                return None
+
             scores = {}
 
-            # ---- 方法1：从 JSON-LD 结构化数据提取 ----
+            # ---- 方法1（最可靠）：data-json="reviewsData" script 标签 ----
+            # 格式: {"audienceScore":{"score":"91",...},"criticsScore":{"score":"87",...}}
+            reviews_data_m = re.search(
+                r'<script[^>]+data-json="reviewsData"[^>]*>(.*?)</script>',
+                text, re.DOTALL
+            )
+            if reviews_data_m:
+                try:
+                    data = json.loads(reviews_data_m.group(1))
+                    critic_info = data.get("criticsScore", {})
+                    audience_info = data.get("audienceScore", {})
+                    if critic_info.get("score"):
+                        scores["critic"] = critic_info["score"]
+                    if audience_info.get("score"):
+                        scores["audience"] = audience_info["score"]
+                    print(f"[RTScraper] 从 reviewsData 提取: {scores}")
+                    if scores:
+                        return scores
+                except Exception as e:
+                    print(f"[RTScraper] reviewsData 解析失败: {e}")
+
+            # ---- 方法2：页面内嵌 JSON 大块（含 audienceScore/criticsScore） ----
+            json_scripts = re.findall(
+                r'<script[^>]+type="application/json"[^>]*>(.*?)</script>',
+                text, re.DOTALL
+            )
+            for raw in json_scripts:
+                if '"audienceScore"' not in raw and '"criticsScore"' not in raw:
+                    continue
+                try:
+                    data = json.loads(raw)
+                    critic_info = data.get("criticsScore", {})
+                    audience_info = data.get("audienceScore", {})
+                    if isinstance(audience_info, dict) and audience_info.get("score"):
+                        scores["audience"] = str(audience_info["score"])
+                    if isinstance(critic_info, dict) and critic_info.get("score"):
+                        scores["critic"] = str(critic_info["score"])
+                    if scores:
+                        print(f"[RTScraper] 从内嵌 JSON 提取: {scores}")
+                        return scores
+                except Exception:
+                    continue
+
+            # ---- 方法3：JSON-LD aggregateRating（仅专业分）----
             jsonld_blocks = re.findall(
                 r'<script[^>]+type="application/ld\+json"[^>]*>(.*?)</script>',
                 text, re.DOTALL
@@ -128,61 +175,6 @@ class RTScraper:
                 except Exception:
                     continue
 
-            # ---- 方法2：从页面内嵌 JSON state 提取 ----
-            state_matches = re.findall(
-                r'window\.__reactRoot\s*=\s*({.*?});\s*</script>',
-                text, re.DOTALL
-            )
-            for raw in state_matches:
-                try:
-                    data = json.loads(raw)
-                    c, a = self._find_scores_in_state(data)
-                    if c:
-                        scores["critic"] = c
-                    if a:
-                        scores["audience"] = a
-                    if scores:
-                        break
-                except Exception:
-                    continue
-
-            # ---- 方法3：直接正则匹配 score 数字 ----
-            if "critic" not in scores:
-                # Tomatometer: 通常在 <rt-button slot="criticsScore"> 或 score-board
-                tmt = re.findall(
-                    r'(?:tomatometer-score|criticsScore|"tomatometer")["\s:>]*(\d{1,3})',
-                    text
-                )
-                if tmt:
-                    scores["critic"] = tmt[0]
-
-            if "audience" not in scores:
-                # Audience Score
-                aud = re.findall(
-                    r'(?:audience-score|audienceScore|"audienceScore|popcornmeter)["\s:>]*(\d{1,3})',
-                    text
-                )
-                if aud:
-                    scores["audience"] = aud[0]
-
-            # ---- 方法4：解析 <score-board> 自定义元素属性 ----
-            if "critic" not in scores or "audience" not in scores:
-                sb = re.search(
-                    r'<score-board[^>]+tomatometerscore="(\d+)"[^>]+audiencescore="(\d+)"',
-                    text, re.IGNORECASE
-                )
-                if not sb:
-                    sb = re.search(
-                        r'<score-board[^>]+audiencescore="(\d+)"[^>]+tomatometerscore="(\d+)"',
-                        text, re.IGNORECASE
-                    )
-                    if sb:
-                        scores.setdefault("audience", sb.group(1))
-                        scores.setdefault("critic", sb.group(2))
-                else:
-                    scores.setdefault("critic", sb.group(1))
-                    scores.setdefault("audience", sb.group(2))
-
             if scores:
                 print(f"[RTScraper] 评分提取结果: {scores}")
                 return scores
@@ -190,26 +182,6 @@ class RTScraper:
         except Exception as e:
             print(f"[RTScraper] 页面抓取失败: {e}")
         return None
-
-    def _find_scores_in_state(self, data, depth=0):
-        """递归从 React state JSON 中找专业分和观众分"""
-        if depth > 8 or not isinstance(data, (dict, list)):
-            return None, None
-        if isinstance(data, dict):
-            critic = data.get("tomatometer") or data.get("criticsScore") or data.get("tomatometerScore")
-            audience = data.get("audienceScore") or data.get("popcornmeter") or data.get("audienceMeter")
-            if critic or audience:
-                return (str(critic) if critic else None, str(audience) if audience else None)
-            for v in data.values():
-                c, a = self._find_scores_in_state(v, depth + 1)
-                if c or a:
-                    return c, a
-        elif isinstance(data, list):
-            for item in data:
-                c, a = self._find_scores_in_state(item, depth + 1)
-                if c or a:
-                    return c, a
-        return None, None
 
     # ------------------------------------------------------------------ #
     #  对外接口

@@ -90,10 +90,29 @@ def get_movie_data(movie_name):
     if douban_search_name != movie_name:
         print(f"英文搜索，大模型翻译为中文: {movie_name} -> {douban_search_name}")
 
-    # 首先通过OMDb API搜索电影
+    # 先尝试 OMDb 搜索
     omdb_data = search_omdb(omdb_search_name)
 
+    # ---- 如果 OMDb 找不到（如非英语电影），尝试豆瓣单独返回结果 ----
     if not omdb_data:
+        print(f"OMDb 未找到 '{omdb_search_name}'，尝试仅通过豆瓣返回数据")
+        douban_data = get_douban_rating(douban_search_name, movie_name)
+        if douban_data and douban_data.get('score', 0) and float(douban_data['score']) > 0:
+            # 用豆瓣搜索结果中的电影信息构建基本数据
+            douban_full = get_douban_full_info(douban_search_name, movie_name)
+            movie_info = {
+                'title': douban_full.get('title', movie_name) if douban_full else movie_name,
+                'year': douban_full.get('year', '') if douban_full else '',
+                'genre': '、'.join(douban_full.get('genres', [])) if douban_full else '',
+                'director': '、'.join(douban_full.get('directors', [])) if douban_full else '',
+                'actors': '、'.join(douban_full.get('casts', [])) if douban_full else '',
+                'plot': douban_full.get('summary', '') if douban_full else '',
+                'poster': douban_full.get('poster', '') if douban_full else '',
+                'imdb': None,
+                'rottenTomatoes': None,
+                'douban': douban_data
+            }
+            return movie_info
         return None
 
     # 构建返回数据
@@ -261,45 +280,60 @@ def get_rotten_tomatoes_scores(omdb_data, movie_name):
     return rt_data if rt_data else None
 
 def get_douban_rating(search_name, original_name, imdb_id=None):
-    """获取豆瓣评分
+    """获取豆瓣评分（仅返回分数和票数）
     
     Args:
-        search_name: 用于豆瓣搜索的名称（可能是中文）
+        search_name: 用于豆瓣搜索的名称（优先用中文）
         original_name: 用户原始输入的名称
         imdb_id: IMDb ID（可选）
     """
     try:
         print(f"Getting Douban rating for: {search_name} (original: {original_name})")
-        
-        # 创建豆瓣爬虫实例
         scraper = DoubanMovieScraper(delay_enable=True)
-        
-        # 首先尝试使用转换后的名称搜索
-        rating_info = scraper.get_movie_rating_only(search_name)
-        print(f"Douban rating info for '{search_name}': {rating_info}")
-        
-        if rating_info and rating_info['score'] > 0:
-            return {
-                'score': str(rating_info['score']),
-                'votes': rating_info['votes']
-            }
-        
-        # 如果转换后的名称没找到，且与原始名称不同，尝试用原始名称
-        if search_name != original_name:
-            print(f"Trying with original name: {original_name}")
-            rating_info = scraper.get_movie_rating_only(original_name)
-            print(f"Douban rating info for '{original_name}': {rating_info}")
-            
-            if rating_info and rating_info['score'] > 0:
+
+        # 构建搜索候选列表：优先中文名，再原始名，再英文名（若不同）
+        candidates = [search_name]
+        if original_name and original_name != search_name:
+            candidates.append(original_name)
+
+        for name in candidates:
+            rating_info = scraper.get_movie_rating_only(name)
+            print(f"Douban rating for '{name}': {rating_info}")
+            if rating_info and rating_info.get('score', 0) > 0:
                 return {
                     'score': str(rating_info['score']),
                     'votes': rating_info['votes']
                 }
-        
+
         return None
-        
+
     except Exception as e:
         print(f"获取豆瓣评分时出错: {str(e)}")
+        return None
+
+
+def get_douban_full_info(search_name, original_name):
+    """获取豆瓣电影完整信息（用于 OMDb 找不到时填充基本信息）
+    
+    Args:
+        search_name: 优先用中文名搜索
+        original_name: 用户原始输入
+    """
+    try:
+        scraper = DoubanMovieScraper(delay_enable=True)
+        candidates = [search_name]
+        if original_name and original_name != search_name:
+            candidates.append(original_name)
+
+        for name in candidates:
+            info = scraper.search_movie(name)
+            if info and info.get('rating', 0) > 0:
+                return info
+
+        return None
+
+    except Exception as e:
+        print(f"获取豆瓣完整信息时出错: {str(e)}")
         return None
 
 def parse_votes(votes_str):
