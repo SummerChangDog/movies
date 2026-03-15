@@ -116,6 +116,19 @@ def get_movie_data(movie_name):
             if english_title:
                 omdb_retry = search_omdb(english_title)
 
+            # 确定海报：优先豆瓣，若无则回退到 OMDb 重试结果
+            douban_poster = (douban_full.get('poster', '') if douban_full else '') or ''
+            if not douban_poster or douban_poster == 'N/A':
+                # 豆瓣无海报，尝试 OMDb 重试结果
+                omdb_poster = (omdb_retry.get('Poster', '') if omdb_retry else '') or ''
+                if omdb_poster == 'N/A':
+                    omdb_poster = ''
+                final_poster = omdb_poster
+                if final_poster:
+                    print(f"[Poster] 豆瓣无海报，使用 OMDb 海报")
+            else:
+                final_poster = douban_poster
+
             movie_info = {
                 'title': douban_full.get('title', movie_name) if douban_full else movie_name,
                 'year': douban_full.get('year', '') if douban_full else '',
@@ -123,7 +136,7 @@ def get_movie_data(movie_name):
                 'director': '、'.join(douban_full.get('directors', [])) if douban_full else '',
                 'actors': '、'.join(douban_full.get('casts', [])) if douban_full else '',
                 'plot': douban_full.get('summary', '') if douban_full else '',
-                'poster': douban_full.get('poster', '') if douban_full else '',
+                'poster': final_poster,
                 'imdb': None,
                 'rottenTomatoes': None,
                 'douban': douban_data
@@ -149,7 +162,12 @@ def get_movie_data(movie_name):
             return movie_info
         return None
 
-    # 构建返回数据
+    # 确定海报：优先 OMDb，若无则从豆瓣获取
+    omdb_poster = omdb_data.get('Poster', '') or ''
+    if omdb_poster == 'N/A':
+        omdb_poster = ''
+
+    # 构建返回数据（暂用 OMDb 海报，稍后可能被豆瓣海报替换）
     movie_info = {
         'title': omdb_data.get('Title', ''),
         'year': omdb_data.get('Year', ''),
@@ -157,7 +175,7 @@ def get_movie_data(movie_name):
         'director': omdb_data.get('Director', ''),
         'actors': omdb_data.get('Actors', ''),
         'plot': omdb_data.get('Plot', ''),
-        'poster': omdb_data.get('Poster', ''),
+        'poster': omdb_poster,
         'imdb': None,
         'rottenTomatoes': None,
         'douban': None
@@ -180,6 +198,23 @@ def get_movie_data(movie_name):
     douban_data = get_douban_rating(douban_search_name, movie_name, omdb_data.get('imdbID'))
     if douban_data:
         movie_info['douban'] = douban_data
+
+    # ---- 海报回退：若 OMDb 无海报，尝试从豆瓣获取 ----
+    if not omdb_poster:
+        try:
+            scraper = DoubanMovieScraper(delay_enable=True)
+            # 按候选顺序搜索：中文名优先，再尝试原始输入
+            poster_candidates = [douban_search_name]
+            if movie_name != douban_search_name:
+                poster_candidates.append(movie_name)
+            for cand in poster_candidates:
+                douban_info = scraper.search_movie(cand)
+                if douban_info and douban_info.get('poster'):
+                    movie_info['poster'] = douban_info['poster']
+                    print(f"[Poster] OMDb 无海报，使用豆瓣海报（搜索词：{cand}）")
+                    break
+        except Exception as e:
+            print(f"[Poster] 获取豆瓣海报失败: {e}")
 
     return movie_info
 
