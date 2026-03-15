@@ -13,6 +13,7 @@ import gzip
 
 # 豆瓣电影相关URL
 DOUBAN_MOVIE_SEARCH_URL = "https://movie.douban.com/j/subject_suggest"
+DOUBAN_MOVIE_SEARCH_PAGE_URL = "https://search.douban.com/movie/subject_search"
 DOUBAN_MOVIE_BASE_URL = "https://movie.douban.com"
 DOUBAN_MOVIE_DETAIL_URL = "https://movie.douban.com/subject/{id}/"
 
@@ -82,12 +83,24 @@ class DoubanMovieScraper:
     def get_movie_id(self, movie_name):
         """
         通过电影名获取豆瓣电影ID
-        使用豆瓣的搜索建议接口
+        先尝试搜索建议API，失败则使用搜索页面
         """
+        # 首先尝试搜索建议API
+        movie_id = self._get_movie_id_from_api(movie_name)
+        if movie_id:
+            return movie_id
+        
+        # 如果API失败，尝试搜索页面
+        print(f"[DoubanScraper] API search failed, trying search page")
+        return self._get_movie_id_from_search_page(movie_name)
+    
+    def _get_movie_id_from_api(self, movie_name):
+        """使用搜索建议API获取电影ID"""
         try:
             # 构建搜索URL
             params = {'q': movie_name}
             url = f"{DOUBAN_MOVIE_SEARCH_URL}?{urlencode(params)}"
+            print(f"[DoubanScraper] API URL: {url}")
             
             # 发送请求
             req = Request(url, headers=self.get_headers())
@@ -97,17 +110,56 @@ class DoubanMovieScraper:
             # 解析JSON响应
             import json
             data = json.loads(content)
+            print(f"[DoubanScraper] API response: {data[:200] if data else 'Empty'}")
             
             # 获取第一个电影结果
             if data and len(data) > 0:
                 for item in data:
                     if item.get('type') == 'movie':
-                        return item.get('id')
+                        movie_id = item.get('id')
+                        print(f"[DoubanScraper] Found movie ID from API: {movie_id}")
+                        return movie_id
             
             return None
             
         except Exception as e:
-            print(f"获取电影ID时出错: {e}")
+            print(f"[DoubanScraper] API error: {e}")
+            return None
+    
+    def _get_movie_id_from_search_page(self, movie_name):
+        """从搜索页面获取电影ID"""
+        try:
+            # 构建搜索页面URL
+            params = {
+                'search_text': movie_name,
+                'cat': 1002
+            }
+            url = f"{DOUBAN_MOVIE_SEARCH_PAGE_URL}?{urlencode(params)}"
+            print(f"[DoubanScraper] Search page URL: {url}")
+            
+            # 添加延迟
+            self.random_delay()
+            
+            # 发送请求
+            req = Request(url, headers=self.get_headers())
+            response = urlopen(req, timeout=10)
+            content = self.get_response_content(response)
+            
+            # 使用正则表达式提取电影ID
+            # 豆瓣电影页面链接格式: https://movie.douban.com/subject/12345/
+            pattern = r'https://movie\.douban\.com/subject/(\d+)/'
+            matches = re.findall(pattern, content)
+            
+            if matches:
+                movie_id = matches[0]
+                print(f"[DoubanScraper] Found movie ID from search page: {movie_id}")
+                return movie_id
+            
+            print(f"[DoubanScraper] No movie ID found in search page")
+            return None
+            
+        except Exception as e:
+            print(f"[DoubanScraper] Search page error: {e}")
             return None
     
     def get_movie_details(self, movie_id):
@@ -203,13 +255,18 @@ class DoubanMovieScraper:
         :param movie_name: 电影名称
         :return: {'score': 评分, 'votes': 评价人数} 或 None
         """
+        print(f"[DoubanScraper] Starting search for: {movie_name}")
         movie_info = self.search_movie(movie_name)
+        
         if movie_info:
+            print(f"[DoubanScraper] Found movie info: {movie_info.get('title')} - Rating: {movie_info.get('rating')}")
             return {
                 'score': movie_info.get('rating', 0),
                 'votes': movie_info.get('votes', 0)
             }
-        return None
+        else:
+            print(f"[DoubanScraper] No movie info found for: {movie_name}")
+            return {'score': 0, 'votes': 0}
 
 
 # 测试代码
