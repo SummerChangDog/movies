@@ -171,7 +171,7 @@ def search_omdb(movie_name):
     }
     
     # 检查是否有有效的API密钥
-    if OMDB_API_KEY and OMDB_API_KEY != 'your-api-key-here' and OMDB_API_KEY != 'dab94b1c':
+    if OMDB_API_KEY and OMDB_API_KEY != 'your-api-key-here':
         print(f"Searching OMDb for: {movie_name}")
         print(f"Using API key: {OMDB_API_KEY[:4]}...")
         
