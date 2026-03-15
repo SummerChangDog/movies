@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>电影评分聚合 - Movie Rating Hub</title>
+    <link rel="stylesheet" href="static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <header>
+            <h1 class="title">
+                <i class="fas fa-film"></i>
+                电影评分聚合
+            </h1>
+            <p class="subtitle">一站查看豆瓣、IMDb、烂番茄评分</p>
+        </header>
+
+        <!-- 搜索区域 -->
+        <div class="search-section">
+            <div class="search-box">
+                <input type="text" 
+                       id="movieInput" 
+                       class="search-input" 
+                       placeholder="输入电影名称（中文或英文）..."
+                       autocomplete="off">
+                <button id="searchBtn" class="search-btn">
+                    <i class="fas fa-search"></i>
+                    搜索
+                </button>
+            </div>
+            <div class="search-hint">
+                试试搜索：肖申克的救赎、The Shawshank Redemption、星际穿越、Inception
+            </div>
+        </div>
+
+        <!-- 加载动画 -->
+        <div id="loader" class="loader hidden">
+            <div class="loader-spinner"></div>
+            <p>正在搜索电影信息...</p>
+        </div>
+
+        <!-- 错误提示 -->
+        <div id="error" class="error-message hidden">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span id="errorText"></span>
+        </div>
+
+        <!-- 搜索结果 -->
+        <div id="results" class="results-section hidden">
+            <!-- 电影基本信息 -->
+            <div class="movie-info">
+                <img id="moviePoster" class="movie-poster" src="" alt="">
+                <div class="movie-details">
+                    <h2 id="movieTitle" class="movie-title"></h2>
+                    <p id="movieYear" class="movie-year"></p>
+                    <p id="movieGenre" class="movie-genre"></p>
+                    <p id="movieDirector" class="movie-director"></p>
+                    <p id="movieActors" class="movie-actors"></p>
+                    <p id="moviePlot" class="movie-plot"></p>
+                </div>
+            </div>
+
+            <!-- 评分卡片 -->
+            <div class="ratings-grid">
+                <!-- 豆瓣评分 -->
+                <div class="rating-card douban">
+                    <div class="rating-header">
+                        <img src="static/images/douban-logo.png" alt="豆瓣" class="platform-logo">
+                        <h3>豆瓣评分</h3>
+                    </div>
+                    <div class="rating-score">
+                        <span id="doubanScore" class="score-number">-</span>
+                        <span class="score-total">/10</span>
+                    </div>
+                    <div class="rating-count">
+                        <i class="fas fa-users"></i>
+                        <span id="doubanVotes">-</span> 人评价
+                    </div>
+                    <div class="rating-stars">
+                        <div id="doubanStars" class="stars"></div>
+                    </div>
+                </div>
+
+                <!-- IMDb评分 -->
+                <div class="rating-card imdb">
+                    <div class="rating-header">
+                        <img src="static/images/imdb-logo.png" alt="IMDb" class="platform-logo">
+                        <h3>IMDb评分</h3>
+                    </div>
+                    <div class="rating-score">
+                        <span id="imdbScore" class="score-number">-</span>
+                        <span class="score-total">/10</span>
+                    </div>
+                    <div class="rating-count">
+                        <i class="fas fa-users"></i>
+                        <span id="imdbVotes">-</span> 人评价
+                    </div>
+                    <div class="rating-stars">
+                        <div id="imdbStars" class="stars"></div>
+                    </div>
+                </div>
+
+                <!-- 烂番茄评分 -->
+                <div class="rating-card rotten-tomatoes">
+                    <div class="rating-header">
+                        <img src="static/images/rt-logo.png" alt="Rotten Tomatoes" class="platform-logo">
+                        <h3>烂番茄评分</h3>
+                    </div>
+                    <div class="rt-scores">
+                        <div class="rt-score-item">
+                            <div class="rt-icon">
+                                <i id="rtCriticIcon" class="fas fa-tomato"></i>
+                            </div>
+                            <div class="rt-score-details">
+                                <span class="rt-label">专业影评</span>
+                                <span id="rtCriticScore" class="rt-percentage">-%</span>
+                            </div>
+                        </div>
+                        <div class="rt-score-item">
+                            <div class="rt-icon">
+                                <i id="rtAudienceIcon" class="fas fa-popcorn"></i>
+                            </div>
+                            <div class="rt-score-details">
+                                <span class="rt-label">观众评分</span>
+                                <span id="rtAudienceScore" class="rt-percentage">-%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 页脚 -->
+        <footer>
+            <p>Made with <i class="fas fa-heart"></i> by Movie Rating Hub</p>
+            <p class="footer-links">
+                <a href="https://github.com/yourusername/movies" target="_blank">
+                    <i class="fab fa-github"></i> GitHub
+                </a>
+            </p>
+        </footer>
+    </div>
+
+    <script src="static/script.js"></script>
+</body>
+</html>
