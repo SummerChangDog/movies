@@ -67,6 +67,8 @@ async function handleSearch() {
     
     try {
         // 调用后端API
+        console.log('正在搜索电影:', movieName);
+        
         const response = await fetch('/api/search', {
             method: 'POST',
             headers: {
@@ -75,11 +77,14 @@ async function handleSearch() {
             body: JSON.stringify({ movie_name: movieName })
         });
         
-        if (!response.ok) {
-            throw new Error('搜索失败');
-        }
+        console.log('响应状态:', response.status, response.statusText);
         
         const data = await response.json();
+        console.log('响应数据:', data);
+        
+        if (!response.ok) {
+            throw new Error(data.error || `搜索失败 (${response.status})`);
+        }
         
         if (data.error) {
             throw new Error(data.error);

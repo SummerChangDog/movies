@@ -8,7 +8,7 @@ load_dotenv()
 # 请从 http://www.omdbapi.com/apikey.aspx 获取免费的API密钥
 # 然后设置环境变量 OMDB_API_KEY 或直接在下面填写
 # 注意：OMDb API同时提供IMDb和烂番茄(Rotten Tomatoes)的评分数据
-OMDB_API_KEY = os.getenv('OMDB_API_KEY', "dab94b1c")
+OMDB_API_KEY = os.getenv('OMDB_API_KEY', 'dab94b1c')
 
 # 豆瓣API配置（如果有）
 # 注意：豆瓣API需要申请，目前使用模拟数据
