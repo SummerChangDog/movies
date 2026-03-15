@@ -95,11 +95,27 @@ def get_movie_data(movie_name):
 
     # ---- 如果 OMDb 找不到（如非英语电影），尝试豆瓣单独返回结果 ----
     if not omdb_data:
+        import re as _re
         print(f"OMDb 未找到 '{omdb_search_name}'，尝试仅通过豆瓣返回数据")
         douban_data = get_douban_rating(douban_search_name, movie_name)
         if douban_data and douban_data.get('score', 0) and float(douban_data['score']) > 0:
             # 用豆瓣搜索结果中的电影信息构建基本数据
             douban_full = get_douban_full_info(douban_search_name, movie_name)
+
+            # 从豆瓣合并标题（如"闪灵 The Shining"）中提取英文名，用于 OMDb/RT 查询
+            english_title = None
+            if douban_full:
+                combined = douban_full.get('title', '')
+                en_match = _re.search(r'[A-Za-z][A-Za-z0-9\s:\',!?&\-]{2,}', combined)
+                if en_match:
+                    english_title = en_match.group(0).strip()
+                    print(f"从豆瓣标题提取英文名: {english_title}")
+
+            # 用英文名重试 OMDb（可能获取到 IMDb 评分）
+            omdb_retry = None
+            if english_title:
+                omdb_retry = search_omdb(english_title)
+
             movie_info = {
                 'title': douban_full.get('title', movie_name) if douban_full else movie_name,
                 'year': douban_full.get('year', '') if douban_full else '',
@@ -112,6 +128,24 @@ def get_movie_data(movie_name):
                 'rottenTomatoes': None,
                 'douban': douban_data
             }
+
+            # 如果 OMDb 重试成功，填入 IMDb 评分
+            if omdb_retry:
+                if omdb_retry.get('imdbRating') and omdb_retry.get('imdbRating') != 'N/A':
+                    movie_info['imdb'] = {
+                        'score': omdb_retry['imdbRating'],
+                        'votes': parse_votes(omdb_retry.get('imdbVotes', '0'))
+                    }
+
+            # 用英文名抓取 RT 评分（传入年份以提高匹配准确性）
+            if english_title:
+                rt_source = omdb_retry if omdb_retry else {}
+                douban_year = douban_full.get('year', '') if douban_full else ''
+                rt_data = get_rotten_tomatoes_scores(rt_source, english_title,
+                                                     year=douban_year)
+                if rt_data:
+                    movie_info['rottenTomatoes'] = rt_data
+
             return movie_info
         return None
 
@@ -137,7 +171,8 @@ def get_movie_data(movie_name):
         }
 
     # 烂番茄评分（OMDb 专业分 + RT 网站抓取观众分）
-    rt_data = get_rotten_tomatoes_scores(omdb_data, omdb_search_name)
+    rt_data = get_rotten_tomatoes_scores(omdb_data, omdb_search_name,
+                                         year=omdb_data.get('Year', ''))
     if rt_data:
         movie_info['rottenTomatoes'] = rt_data
 
@@ -238,14 +273,15 @@ def search_omdb(movie_name):
     print("Using mock data for testing (OMDb API key invalid or not set)")
     return mock_data.get(movie_name, None)
 
-def get_rotten_tomatoes_scores(omdb_data, movie_name):
+def get_rotten_tomatoes_scores(omdb_data, movie_name, year=None):
     """
     获取烂番茄评分：
     - 专业评分（Tomatometer）：优先从 OMDb 数据中提取，其次用 Metascore 代替
     - 观众评分（Audience Score）：从 RT 网站直接抓取
-    
-    :param omdb_data: OMDb API 返回的电影数据
+
+    :param omdb_data: OMDb API 返回的电影数据（可为空 dict）
     :param movie_name: 英文电影名（用于 RT 网站搜索）
+    :param year: 上映年份（可选，用于区分同名电影）
     :return: {'critic': '87', 'audience': '91'} 或 None
     """
     rt_data = {}
@@ -263,19 +299,18 @@ def get_rotten_tomatoes_scores(omdb_data, movie_name):
         if metascore and metascore != 'N/A':
             rt_data['critic'] = metascore
 
-    # 2. 观众评分：直接从 RT 网站抓取
+    # 2. 观众评分（同时也可补充专业分）：直接从 RT 网站抓取
     try:
-        rt_scraper = RTScraper()
-        scraped = rt_scraper.get_movie_scores(movie_name)
+        rt_scraper_obj = RTScraper()
+        scraped = rt_scraper_obj.get_movie_scores(movie_name, year=year)
         if scraped:
-            # 如果爬到了专业分且 OMDb 没有，也一并使用
-            if 'critic' not in rt_data and scraped.get('critic'):
+            # RT 网站的专业分覆盖优先级更高（来源最权威）
+            if scraped.get('critic'):
                 rt_data['critic'] = scraped['critic']
-            # 观众评分
             if scraped.get('audience'):
                 rt_data['audience'] = scraped['audience']
     except Exception as e:
-        print(f"[RT] 抓取观众评分失败: {e}")
+        print(f"[RT] 抓取评分失败: {e}")
 
     return rt_data if rt_data else None
 
