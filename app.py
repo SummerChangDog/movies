@@ -7,6 +7,8 @@ import json
 from urllib.parse import quote
 from config import Config, OMDB_API_KEY
 from douban_movie_scraper import DoubanMovieScraper
+from movie_translator import get_omdb_name, get_douban_name
+from rt_scraper import RTScraper
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -76,68 +78,24 @@ def search_movie():
 
 def get_movie_data(movie_name):
     """获取电影数据"""
-    # 电影名称中英文映射（可以扩展这个字典）
-    movie_name_mapping = {
-        # 英文 -> 中文
-        'The Shining': '闪灵',
-        'The Shawshank Redemption': '肖申克的救赎',
-        'Inception': '盗梦空间',
-        'Interstellar': '星际穿越',
-        'The Dark Knight': '蝙蝠侠：黑暗骑士',
-        'The Godfather': '教父',
-        'Forrest Gump': '阿甘正传',
-        'The Matrix': '黑客帝国',
-        'Titanic': '泰坦尼克号',
-        'Avatar': '阿凡达',
-        'The Terminator': '终结者',
-        'Pulp Fiction': '低俗小说',
-        'Fight Club': '搏击俱乐部',
-        'The Lord of the Rings': '指环王',
-        'Star Wars': '星球大战',
-        # 中文 -> 英文（反向映射）
-        '闪灵': 'The Shining',
-        '肖申克的救赎': 'The Shawshank Redemption',
-        '盗梦空间': 'Inception',
-        '星际穿越': 'Interstellar',
-        '蝙蝠侠：黑暗骑士': 'The Dark Knight',
-        '教父': 'The Godfather',
-        '阿甘正传': 'Forrest Gump',
-        '黑客帝国': 'The Matrix',
-        '泰坦尼克号': 'Titanic',
-        '阿凡达': 'Avatar',
-        '终结者': 'The Terminator',
-        '低俗小说': 'Pulp Fiction',
-        '搏击俱乐部': 'Fight Club',
-        '指环王': 'The Lord of the Rings',
-        '星球大战': 'Star Wars'
-    }
-    
-    # 检测是否是中文
-    def contains_chinese(text):
-        for char in text:
-            if '\u4e00' <= char <= '\u9fff':
-                return True
-        return False
-    
-    is_chinese = contains_chinese(movie_name)
-    omdb_search_name = movie_name
-    douban_search_name = movie_name
-    
-    # 如果是中文，尝试找到对应的英文名用于OMDb搜索
-    if is_chinese and movie_name in movie_name_mapping:
-        omdb_search_name = movie_name_mapping[movie_name]
-        print(f"中文搜索，转换为英文: {movie_name} -> {omdb_search_name}")
-    # 如果是英文，尝试找到对应的中文名用于豆瓣搜索
-    elif not is_chinese and movie_name in movie_name_mapping:
-        douban_search_name = movie_name_mapping[movie_name]
-        print(f"英文搜索，准备豆瓣中文名: {movie_name} -> {douban_search_name}")
-    
+
+    # ---- 使用大模型翻译获取中英文名称 ----
+    # get_omdb_name：中文→英文（英文直接返回）
+    # get_douban_name：英文→中文（中文直接返回）
+    omdb_search_name = get_omdb_name(movie_name)
+    douban_search_name = get_douban_name(movie_name)
+
+    if omdb_search_name != movie_name:
+        print(f"中文搜索，大模型翻译为英文: {movie_name} -> {omdb_search_name}")
+    if douban_search_name != movie_name:
+        print(f"英文搜索，大模型翻译为中文: {movie_name} -> {douban_search_name}")
+
     # 首先通过OMDb API搜索电影
     omdb_data = search_omdb(omdb_search_name)
-    
+
     if not omdb_data:
         return None
-    
+
     # 构建返回数据
     movie_info = {
         'title': omdb_data.get('Title', ''),
@@ -151,24 +109,24 @@ def get_movie_data(movie_name):
         'rottenTomatoes': None,
         'douban': None
     }
-    
+
     # IMDb评分
     if omdb_data.get('imdbRating') and omdb_data.get('imdbRating') != 'N/A':
         movie_info['imdb'] = {
             'score': omdb_data.get('imdbRating'),
             'votes': parse_votes(omdb_data.get('imdbVotes', '0'))
         }
-    
-    # 烂番茄评分
-    rt_data = extract_rotten_tomatoes(omdb_data)
+
+    # 烂番茄评分（OMDb 专业分 + RT 网站抓取观众分）
+    rt_data = get_rotten_tomatoes_scores(omdb_data, omdb_search_name)
     if rt_data:
         movie_info['rottenTomatoes'] = rt_data
-    
-    # 豆瓣评分（使用转换后的名称搜索）
+
+    # 豆瓣评分
     douban_data = get_douban_rating(douban_search_name, movie_name, omdb_data.get('imdbID'))
     if douban_data:
         movie_info['douban'] = douban_data
-    
+
     return movie_info
 
 def search_omdb(movie_name):
@@ -261,29 +219,45 @@ def search_omdb(movie_name):
     print("Using mock data for testing (OMDb API key invalid or not set)")
     return mock_data.get(movie_name, None)
 
-def extract_rotten_tomatoes(omdb_data):
-    """从OMDb数据中提取烂番茄评分"""
-    rt_data = {}
+def get_rotten_tomatoes_scores(omdb_data, movie_name):
+    """
+    获取烂番茄评分：
+    - 专业评分（Tomatometer）：优先从 OMDb 数据中提取，其次用 Metascore 代替
+    - 观众评分（Audience Score）：从 RT 网站直接抓取
     
-    # 从Ratings数组中查找烂番茄评分
+    :param omdb_data: OMDb API 返回的电影数据
+    :param movie_name: 英文电影名（用于 RT 网站搜索）
+    :return: {'critic': '87', 'audience': '91'} 或 None
+    """
+    rt_data = {}
+
+    # 1. 专业评分：从 OMDb 的 Ratings 数组提取
     ratings = omdb_data.get('Ratings', [])
     for rating in ratings:
         if rating.get('Source') == 'Rotten Tomatoes':
             rt_data['critic'] = rating.get('Value', '').replace('%', '')
             break
-    
-    # 提取观众评分（如果有）
-    # OMDb API可能在tomatoUserMeter字段返回观众评分
-    if omdb_data.get('tomatoUserMeter'):
-        rt_data['audience'] = omdb_data.get('tomatoUserMeter')
-    
-    # 如果有Metascore，可以作为参考
-    if omdb_data.get('Metascore') and omdb_data.get('Metascore') != 'N/A':
-        # Metascore通常与专业评分相关
-        if 'critic' not in rt_data:
-            # 将Metascore转换为百分比形式
-            rt_data['critic'] = omdb_data.get('Metascore')
-    
+
+    # 备用：用 Metascore 作为专业评分
+    if 'critic' not in rt_data:
+        metascore = omdb_data.get('Metascore', '')
+        if metascore and metascore != 'N/A':
+            rt_data['critic'] = metascore
+
+    # 2. 观众评分：直接从 RT 网站抓取
+    try:
+        rt_scraper = RTScraper()
+        scraped = rt_scraper.get_movie_scores(movie_name)
+        if scraped:
+            # 如果爬到了专业分且 OMDb 没有，也一并使用
+            if 'critic' not in rt_data and scraped.get('critic'):
+                rt_data['critic'] = scraped['critic']
+            # 观众评分
+            if scraped.get('audience'):
+                rt_data['audience'] = scraped['audience']
+    except Exception as e:
+        print(f"[RT] 抓取观众评分失败: {e}")
+
     return rt_data if rt_data else None
 
 def get_douban_rating(search_name, original_name, imdb_id=None):
