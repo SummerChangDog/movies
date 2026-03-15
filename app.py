@@ -499,10 +499,6 @@ def save_to_cache(cache_file, data):
         pass
 
 if __name__ == '__main__':
-    # 检查是否设置了API密钥
-    if not OMDB_API_KEY:
-        print("警告：未设置OMDB_API_KEY，请在环境变量或config.py中设置")
-        print("您可以从 http://www.omdbapi.com/apikey.aspx 获取免费的API密钥")
-    
-    # 运行Flask应用
+    print("提示：建议使用 'python run.py' 启动，以便交互式输入 API Key。")
+    print("直接运行 app.py 时，请确保已通过环境变量或 .env 文件配置好所有 API Key。")
     app.run(debug=True, host='0.0.0.0', port=5000)

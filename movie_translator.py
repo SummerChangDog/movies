@@ -7,11 +7,21 @@ import requests
 
 
 # ------------------------------------------------------------------ #
-#  大模型 API 配置（请填入你的 API 地址和密钥）
+#  大模型 API 配置 — 通过环境变量读取，禁止硬编码
+#  请使用 run.py 启动（会交互式提示输入），或提前设置环境变量：
+#    LLM_API_KEY   大模型 API Key
+#    LLM_API_URL   大模型 Base URL（如 https://api.openai.com/v1）
+#    LLM_MODEL     模型名称（可选，默认 gpt-4o-mini）
 # ------------------------------------------------------------------ #
-LLM_API_URL = "https://api.shubiaobiao.cn/v1"   # 例如: "https://api.openai.com/v1/chat/completions"
-LLM_API_KEY = "sk-ml6NmOaoTjOekZWYEfCaE3E5Ba8346F4A36b0f898e1c7f09"   # 例如: "https://api.shubiaobiao.cn/v1"
-LLM_MODEL   = "gpt-5.1"   # 可根据你使用的服务商修改，如 "deepseek-chat" / "glm-4" 等
+import os as _os
+
+def _get_llm_config():
+    """运行时读取环境变量，保证 run.py 设置好 env 后才取值。"""
+    return (
+        _os.environ.get("LLM_API_URL", "").rstrip("/"),
+        _os.environ.get("LLM_API_KEY", ""),
+        _os.environ.get("LLM_MODEL", "gpt-4o-mini"),
+    )
 
 
 def _contains_chinese(text: str) -> bool:
@@ -24,16 +34,18 @@ def _call_llm(prompt: str) -> str | None:
     向大模型 API 发送单轮对话请求，返回模型回复文本。
     如果请求失败则返回 None。
     """
-    if not LLM_API_URL or not LLM_API_KEY:
+    llm_api_url, llm_api_key, llm_model = _get_llm_config()
+
+    if not llm_api_url or not llm_api_key:
         print("[Translator] 未配置 LLM_API_URL 或 LLM_API_KEY，跳过翻译")
         return None
 
     headers = {
-        "Authorization": f"Bearer {LLM_API_KEY}",
+        "Authorization": f"Bearer {llm_api_key}",
         "Content-Type": "application/json",
     }
     payload = {
-        "model": LLM_MODEL,
+        "model": llm_model,
         "messages": [
             {
                 "role": "system",
@@ -53,7 +65,7 @@ def _call_llm(prompt: str) -> str | None:
     }
 
     try:
-        resp = requests.post(LLM_API_URL, json=payload, headers=headers, timeout=15)
+        resp = requests.post(f"{llm_api_url}/chat/completions", json=payload, headers=headers, timeout=15)
         resp.raise_for_status()
         data = resp.json()
         translated = data["choices"][0]["message"]["content"].strip()
