@@ -609,6 +609,104 @@ footer i.fa-heart {
     white-space: nowrap;
 }
 
+/* ---- 雷达图：评分性格对比 ---- */
+.radar-section {
+    background: white;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 30px 30px 28px;
+    margin-bottom: 40px;
+    animation: fadeIn 0.5s ease;
+}
+
+.radar-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.radar-title i {
+    color: var(--secondary-color);
+    font-size: 1.1rem;
+}
+
+.radar-subtitle {
+    font-size: 0.88rem;
+    color: var(--text-light);
+    margin-bottom: 22px;
+}
+
+.radar-container {
+    width: 100%;
+    max-width: 480px;
+    margin: 0 auto 20px;
+    position: relative;
+}
+
+.radar-container canvas {
+    display: block;
+    width: 100% !important;
+    height: auto !important;
+}
+
+/* 维度说明图例 */
+.radar-legend {
+    display: flex;
+    justify-content: center;
+}
+
+.radar-dim-list {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 20px;
+}
+
+.radar-dim-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.82rem;
+    color: var(--text-dark);
+}
+
+.radar-dim-item small {
+    color: var(--text-light);
+    font-size: 0.75rem;
+}
+
+.dim-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* 5维度颜色（与图中分轴标签对应） */
+.dim-dot.dim-1 { background: #e74c3c; }   /* 极度热爱 — 红 */
+.dim-dot.dim-2 { background: #e67e22; }   /* 喜爱认可 — 橙 */
+.dim-dot.dim-3 { background: #f1c40f; }   /* 中立态度 — 黄 */
+.dim-dot.dim-4 { background: #2ecc71; }   /* 失望批评 — 绿 */
+.dim-dot.dim-5 { background: #3498db; }   /* 强烈抵制 — 蓝 */
+
+@media (max-width: 768px) {
+    .radar-section {
+        padding: 20px 16px 20px;
+    }
+
+    .radar-container {
+        max-width: 100%;
+    }
+
+    .radar-dim-list {
+        gap: 6px 12px;
+    }
+}
+
 /* 工具类 */
 .hidden {
     display: none !important;

@@ -184,6 +184,11 @@ function displayResults(data) {
         rtDistribution.classList.add('hidden');
     }
     
+    // 雷达图
+    const doubanDist = (data.douban && data.douban.rating_distribution) ? data.douban.rating_distribution : null;
+    const imdbDist   = (data.imdb   && data.imdb.rating_distribution)   ? data.imdb.rating_distribution   : null;
+    renderRadarChart(normalizeDouban(doubanDist), normalizeIMDb(imdbDist));
+
     showResults();
 }
 
@@ -415,6 +420,160 @@ function renderRTDistribution(dist) {
         rtDistBars.querySelectorAll('[data-target]').forEach(el => {
             el.style.width = el.dataset.target;
         });
+    });
+}
+
+// ---- 雷达图 ----
+
+let radarChartInstance = null;  // 保存 Chart 实例，下次搜索时销毁重建
+
+/**
+ * 将豆瓣评分分布（5维度）归一化为百分比数组
+ * dist: { '5星': 45.2, '4星': 32.1, '3星': 15.0, '2星': 5.0, '1星': 2.7 }
+ * 返回: [极度热爱%, 喜爱认可%, 中立态度%, 失望批评%, 强烈抵制%]
+ */
+function normalizeDouban(dist) {
+    if (!dist) return null;
+    const raw = [
+        dist['5星'] || 0,   // 极度热爱
+        dist['4星'] || 0,   // 喜爱认可
+        dist['3星'] || 0,   // 中立态度
+        dist['2星'] || 0,   // 失望批评
+        dist['1星'] || 0    // 强烈抵制
+    ];
+    const total = raw.reduce((a, b) => a + b, 0);
+    if (total === 0) return null;
+    return raw.map(v => parseFloat((v / total * 100).toFixed(2)));
+}
+
+/**
+ * 将 IMDb 评分分布（10段）归一化为5维度百分比数组
+ * dist: { '10': {votes, percent}, '9': {...}, ... }
+ * 分组规则：9-10→极度热爱, 7-8→喜爱认可, 5-6→中立态度, 3-4→失望批评, 1-2→强烈抵制
+ * 返回: [极度热爱%, 喜爱认可%, 中立态度%, 失望批评%, 强烈抵制%]
+ */
+function normalizeIMDb(dist) {
+    if (!dist) return null;
+    const get = (key) => (dist[String(key)] ? (dist[String(key)].percent || 0) : 0);
+    const raw = [
+        get(10) + get(9),   // 极度热爱
+        get(8)  + get(7),   // 喜爱认可
+        get(6)  + get(5),   // 中立态度
+        get(4)  + get(3),   // 失望批评
+        get(2)  + get(1)    // 强烈抵制
+    ];
+    const total = raw.reduce((a, b) => a + b, 0);
+    if (total === 0) return null;
+    return raw.map(v => parseFloat((v / total * 100).toFixed(2)));
+}
+
+/**
+ * 渲染雷达图
+ * @param {number[]|null} doubanData  5维百分比数组（归一化后）
+ * @param {number[]|null} imdbData    5维百分比数组（归一化后）
+ */
+function renderRadarChart(doubanData, imdbData) {
+    const section = document.getElementById('radarSection');
+
+    // 两个平台都没有数据时隐藏整个区块
+    if (!doubanData && !imdbData) {
+        section.classList.add('hidden');
+        return;
+    }
+
+    section.classList.remove('hidden');
+
+    // 销毁旧图表实例
+    if (radarChartInstance) {
+        radarChartInstance.destroy();
+        radarChartInstance = null;
+    }
+
+    const labels = ['极度热爱', '喜爱认可', '中立态度', '失望批评', '强烈抵制'];
+    const datasets = [];
+
+    if (doubanData) {
+        datasets.push({
+            label: '豆瓣',
+            data: doubanData,
+            backgroundColor: 'rgba(0, 172, 99, 0.15)',
+            borderColor: 'rgba(0, 172, 99, 0.9)',
+            borderWidth: 2.5,
+            pointBackgroundColor: 'rgba(0, 172, 99, 1)',
+            pointBorderColor: '#fff',
+            pointHoverBackgroundColor: '#fff',
+            pointHoverBorderColor: 'rgba(0, 172, 99, 1)',
+            pointRadius: 4,
+            pointHoverRadius: 6
+        });
+    }
+
+    if (imdbData) {
+        datasets.push({
+            label: 'IMDb',
+            data: imdbData,
+            backgroundColor: 'rgba(245, 197, 24, 0.15)',
+            borderColor: 'rgba(245, 197, 24, 0.95)',
+            borderWidth: 2.5,
+            pointBackgroundColor: 'rgba(245, 197, 24, 1)',
+            pointBorderColor: '#fff',
+            pointHoverBackgroundColor: '#fff',
+            pointHoverBorderColor: 'rgba(245, 197, 24, 1)',
+            pointRadius: 4,
+            pointHoverRadius: 6
+        });
+    }
+
+    const ctx = document.getElementById('radarChart').getContext('2d');
+    radarChartInstance = new Chart(ctx, {
+        type: 'radar',
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            animation: {
+                duration: 800,
+                easing: 'easeInOutQuart'
+            },
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    min: 0,
+                    ticks: {
+                        stepSize: 10,
+                        callback: (v) => v + '%',
+                        font: { size: 10 },
+                        color: '#888',
+                        backdropColor: 'transparent'
+                    },
+                    grid: {
+                        color: 'rgba(0,0,0,0.08)'
+                    },
+                    angleLines: {
+                        color: 'rgba(0,0,0,0.12)'
+                    },
+                    pointLabels: {
+                        font: { size: 13, weight: '600' },
+                        color: '#333'
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        font: { size: 13 },
+                        usePointStyle: true,
+                        padding: 20
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw.toFixed(1)}%`
+                    }
+                }
+            }
+        }
     });
 }
 

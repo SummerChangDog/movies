@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="static/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -144,6 +145,26 @@
                     <div id="rtDistribution" class="rating-distribution hidden">
                         <div class="distribution-title">新鲜度分布</div>
                         <div id="rtDistBars" class="dist-bars"></div>
+                    </div>
+                </div>
+            </div>
+            <!-- 雷达图：评分性格对比 -->
+            <div id="radarSection" class="radar-section hidden">
+                <h3 class="radar-title">
+                    <i class="fas fa-chart-radar"></i>
+                    评分性格对比
+                </h3>
+                <p class="radar-subtitle">豆瓣 vs IMDb — 观众评分行为五维雷达</p>
+                <div class="radar-container">
+                    <canvas id="radarChart"></canvas>
+                </div>
+                <div class="radar-legend">
+                    <div class="radar-dim-list">
+                        <div class="radar-dim-item"><span class="dim-dot dim-1"></span>极度热爱 <small>豆瓣5★ / IMDb 9-10★</small></div>
+                        <div class="radar-dim-item"><span class="dim-dot dim-2"></span>喜爱认可 <small>豆瓣4★ / IMDb 7-8★</small></div>
+                        <div class="radar-dim-item"><span class="dim-dot dim-3"></span>中立态度 <small>豆瓣3★ / IMDb 5-6★</small></div>
+                        <div class="radar-dim-item"><span class="dim-dot dim-4"></span>失望批评 <small>豆瓣2★ / IMDb 3-4★</small></div>
+                        <div class="radar-dim-item"><span class="dim-dot dim-5"></span>强烈抵制 <small>豆瓣1★ / IMDb 1-2★</small></div>
                     </div>
                 </div>
             </div>
