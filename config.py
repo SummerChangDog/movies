@@ -6,7 +6,7 @@ load_dotenv()
 
 # OMDb API配置
 # 请从 http://www.omdbapi.com/apikey.aspx 获取免费的API密钥
-# 通过环境变量 OMDB_API_KEY 或 .env 文件设置，或在启动时由 run.py 交互式收集
+# 通过环境变量 OMDB_API_KEY 或 .env 文件设置
 # 注意：OMDb API同时提供IMDb和烂番茄(Rotten Tomatoes)的评分数据
 OMDB_API_KEY = os.getenv('OMDB_API_KEY', '')
 

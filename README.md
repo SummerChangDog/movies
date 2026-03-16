@@ -22,7 +22,7 @@
 
 1. 克隆仓库
 ```bash
-git clone [你的仓库地址]
+git clone [仓库地址]
 cd movies
 ```
 
