@@ -468,6 +468,10 @@ def get_rotten_tomatoes_scores(omdb_data, movie_name, year=None):
                 rt_data['critic'] = scraped['critic']
             if scraped.get('audience'):
                 rt_data['audience'] = scraped['audience']
+            # 传递评分分布数据
+            if scraped.get('rating_distribution'):
+                rt_data['rating_distribution'] = scraped['rating_distribution']
+                print(f"[RT] 获取到新鲜度分布: {scraped['rating_distribution']}")
     except Exception as e:
         print(f"[RT] 抓取评分失败: {e}")
 

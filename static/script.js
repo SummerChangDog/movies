@@ -32,6 +32,8 @@ const rtCriticScore = document.getElementById('rtCriticScore');
 const rtAudienceScore = document.getElementById('rtAudienceScore');
 const rtCriticIcon = document.getElementById('rtCriticIcon');
 const rtAudienceIcon = document.getElementById('rtAudienceIcon');
+const rtDistribution = document.getElementById('rtDistribution');
+const rtDistBars = document.getElementById('rtDistBars');
 
 // 事件监听
 searchBtn.addEventListener('click', handleSearch);
@@ -160,9 +162,18 @@ function displayResults(data) {
         // 更新图标颜色
         updateRTIcon(rtCriticIcon, data.rottenTomatoes.critic);
         updateRTIcon(rtAudienceIcon, data.rottenTomatoes.audience);
+
+        // 评分分布
+        if (data.rottenTomatoes.rating_distribution &&
+            Object.keys(data.rottenTomatoes.rating_distribution).length > 0) {
+            renderRTDistribution(data.rottenTomatoes.rating_distribution);
+        } else {
+            rtDistribution.classList.add('hidden');
+        }
     } else {
         rtCriticScore.textContent = '-%';
         rtAudienceScore.textContent = '-%';
+        rtDistribution.classList.add('hidden');
     }
     
     showResults();
@@ -318,6 +329,82 @@ function renderIMDbDistribution(dist) {
     // 延迟触发动画
     requestAnimationFrame(() => {
         imdbDistBars.querySelectorAll('.dist-bar-fill').forEach(el => {
+            el.style.width = el.dataset.target;
+        });
+    });
+}
+
+/**
+ * 渲染烂番茄新鲜度分布
+ * dist 格式: {
+ *   critics:  { fresh: 88.0, rotten: 12.0 },
+ *   audience: { liked: 71.0, disliked: 29.0 }
+ * }
+ */
+function renderRTDistribution(dist) {
+    rtDistBars.innerHTML = '';
+
+    // 专业评分部分
+    if (dist.critics) {
+        const freshPct  = dist.critics.fresh  || 0;
+        const rottenPct = dist.critics.rotten || 0;
+
+        const rows = [
+            { label: '🍅 新鲜', pct: freshPct,  cls: 'dist-bar-fill rt-fresh'  },
+            { label: '🤢 腐烂', pct: rottenPct, cls: 'dist-bar-fill rt-rotten' },
+        ];
+        // 分组标题
+        const groupTitle = document.createElement('div');
+        groupTitle.className = 'dist-group-title';
+        groupTitle.textContent = '专业影评';
+        rtDistBars.appendChild(groupTitle);
+
+        rows.forEach(({ label, pct, cls }) => {
+            const row = document.createElement('div');
+            row.className = 'dist-row';
+            row.innerHTML = `
+                <span class="dist-label">${label}</span>
+                <div class="dist-bar-track">
+                    <div class="${cls}" style="width: 0%" data-target="${pct}%"></div>
+                </div>
+                <span class="dist-percent">${pct.toFixed(1)}%</span>
+            `;
+            rtDistBars.appendChild(row);
+        });
+    }
+
+    // 观众评分部分
+    if (dist.audience) {
+        const likedPct    = dist.audience.liked    || 0;
+        const dislikedPct = dist.audience.disliked || 0;
+
+        const rows = [
+            { label: '👍 喜欢',   pct: likedPct,    cls: 'dist-bar-fill rt-liked'    },
+            { label: '👎 不喜欢', pct: dislikedPct, cls: 'dist-bar-fill rt-disliked' },
+        ];
+        const groupTitle = document.createElement('div');
+        groupTitle.className = 'dist-group-title';
+        groupTitle.textContent = '观众评分';
+        rtDistBars.appendChild(groupTitle);
+
+        rows.forEach(({ label, pct, cls }) => {
+            const row = document.createElement('div');
+            row.className = 'dist-row';
+            row.innerHTML = `
+                <span class="dist-label">${label}</span>
+                <div class="dist-bar-track">
+                    <div class="${cls}" style="width: 0%" data-target="${pct}%"></div>
+                </div>
+                <span class="dist-percent">${pct.toFixed(1)}%</span>
+            `;
+            rtDistBars.appendChild(row);
+        });
+    }
+
+    rtDistribution.classList.remove('hidden');
+    // 延迟触发动画
+    requestAnimationFrame(() => {
+        rtDistBars.querySelectorAll('[data-target]').forEach(el => {
             el.style.width = el.dataset.target;
         });
     });

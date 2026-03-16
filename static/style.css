@@ -556,6 +556,44 @@ footer i.fa-heart {
     background: linear-gradient(90deg, #d4a000, #F5C518);
 }
 
+/* 烂番茄条形图颜色 */
+.dist-bar-fill.rt-fresh {
+    background: linear-gradient(90deg, #c62500, #FA320A);
+}
+
+.dist-bar-fill.rt-rotten {
+    background: linear-gradient(90deg, #2d7a3a, #3eaf54);
+}
+
+.dist-bar-fill.rt-liked {
+    background: linear-gradient(90deg, #c87d00, #f5a623);
+}
+
+.dist-bar-fill.rt-disliked {
+    background: linear-gradient(90deg, #555, #888);
+}
+
+/* 分组小标题（用于 RT 分布中的"专业影评"/"观众评分"） */
+.dist-group-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin: 8px 0 4px;
+    padding-left: 2px;
+}
+
+.dist-group-title:first-child {
+    margin-top: 0;
+}
+
+/* RT 分布标签需要更宽以容纳 emoji + 汉字 */
+.rating-card.rotten-tomatoes .dist-label {
+    flex: 0 0 70px;
+    text-align: right;
+}
+
 .dist-percent {
     flex: 0 0 38px;
     text-align: left;

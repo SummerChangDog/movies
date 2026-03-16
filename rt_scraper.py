@@ -220,13 +220,42 @@ class RTScraper:
         s = re.sub(r"_+", "_", s).strip("_")
         return s
 
+    def _build_distribution(self, scores: dict) -> dict:
+        """
+        根据 critic 和 audience 分数，生成烂番茄分布数据：
+        - critics: {'fresh': X, 'rotten': Y}（专业新鲜/腐烂百分比）
+        - audience: {'liked': X, 'disliked': Y}（观众喜欢/不喜欢百分比）
+        """
+        distribution = {}
+        critic = scores.get('critic')
+        audience = scores.get('audience')
+        if critic:
+            try:
+                fresh = float(critic)
+                distribution['critics'] = {
+                    'fresh': round(fresh, 1),
+                    'rotten': round(100 - fresh, 1)
+                }
+            except (ValueError, TypeError):
+                pass
+        if audience:
+            try:
+                liked = float(audience)
+                distribution['audience'] = {
+                    'liked': round(liked, 1),
+                    'disliked': round(100 - liked, 1)
+                }
+            except (ValueError, TypeError):
+                pass
+        return distribution
+
     def get_movie_scores(self, movie_name: str, year: str = None, imdb_id: str = None) -> dict | None:
         """
-        获取烂番茄专业评分和观众评分
+        获取烂番茄专业评分和观众评分，及其分布数据
         :param movie_name: 英文电影名
         :param year: 上映年份（可选，用于区分同名电影）
         :param imdb_id: IMDb ID（可选，暂未使用）
-        :return: {'critic': '87', 'audience': '91'} 或 None
+        :return: {'critic': '87', 'audience': '91', 'rating_distribution': {...}} 或 None
         """
         print(f"[RTScraper] 开始查询: {movie_name}")
 
@@ -248,6 +277,9 @@ class RTScraper:
         for s in slug_candidates:
             scores = self._fetch_scores_from_page(f"/m/{s}")
             if scores:
+                dist = self._build_distribution(scores)
+                if dist:
+                    scores['rating_distribution'] = dist
                 return scores
 
         # 所有直接 URL 失败，通过搜索找路径
@@ -255,6 +287,9 @@ class RTScraper:
         if path:
             scores = self._fetch_scores_from_page(path)
             if scores:
+                dist = self._build_distribution(scores)
+                if dist:
+                    scores['rating_distribution'] = dist
                 return scores
 
         print(f"[RTScraper] 未能获取 {movie_name} 的评分")

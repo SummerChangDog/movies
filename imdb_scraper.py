@@ -65,6 +65,63 @@ class IMDbRatingScraper:
         return None
 
     # ------------------------------------------------------------------ #
+    #  方法0：IMDb GraphQL API（最可靠）
+    # ------------------------------------------------------------------ #
+
+    def _fetch_from_graphql(self, imdb_id: str) -> dict:
+        """
+        使用 IMDb GraphQL API 获取评分直方图。
+        正确路径：aggregateRatingsBreakdown -> histogram -> histogramValues { rating, voteCount }
+        """
+        try:
+            url = "https://api.graphql.imdb.com/"
+            query = """
+            query {
+              title(id: "%s") {
+                aggregateRatingsBreakdown {
+                  histogram {
+                    histogramValues {
+                      rating
+                      voteCount
+                    }
+                  }
+                }
+              }
+            }
+            """ % imdb_id
+            payload = {"query": query}
+            headers = {
+                "Content-Type": "application/json",
+                "User-Agent": random.choice(USER_AGENTS),
+                "Accept": "application/graphql+json, application/json",
+                "x-imdb-client-name": "imdb-web-next-amsterdam",
+                "x-imdb-user-country": "US",
+                "x-imdb-user-language": "en-US",
+                "Origin": "https://www.imdb.com",
+                "Referer": f"https://www.imdb.com/title/{imdb_id}/ratings/",
+            }
+            resp = requests.post(url, json=payload, headers=headers, timeout=15)
+            resp.raise_for_status()
+            data = resp.json()
+
+            # 解析 GraphQL 响应
+            histogram_values = (
+                data.get("data", {})
+                    .get("title", {})
+                    .get("aggregateRatingsBreakdown", {})
+                    .get("histogram", {})
+                    .get("histogramValues", [])
+            )
+            if histogram_values:
+                print(f"[IMDbScraper] GraphQL 获取到 {len(histogram_values)} 条直方图数据")
+                return self._parse_histogram(histogram_values)
+            else:
+                print(f"[IMDbScraper] GraphQL 返回空直方图: {str(data)[:200]}")
+        except Exception as e:
+            print(f"[IMDbScraper] GraphQL 请求失败: {e}")
+        return {}
+
+    # ------------------------------------------------------------------ #
     #  从 IMDb 页面获取评分分布
     # ------------------------------------------------------------------ #
 
@@ -83,12 +140,17 @@ class IMDbRatingScraper:
         if not imdb_id:
             return {}
 
-        # 先尝试主电影页面（含 __NEXT_DATA__ JSON）
+        # 方法0（最可靠）：IMDb 官方 GraphQL API
+        result = self._fetch_from_graphql(imdb_id)
+        if result:
+            return result
+
+        # 方法1：主电影页面（含 __NEXT_DATA__ JSON）
         result = self._fetch_from_title_page(imdb_id)
         if result:
             return result
 
-        # 备用：尝试独立评分页面 /title/{id}/ratings/
+        # 方法2：独立评分页面 /title/{id}/ratings/
         result = self._fetch_from_ratings_page(imdb_id)
         if result:
             return result
