@@ -298,6 +298,11 @@ def get_movie_data(movie_name):
 
     return movie_info
 
+# OMDb 专用 Session：禁用系统代理（避免本地 VPN/Clash 代理超时）
+_omdb_session = requests.Session()
+_omdb_session.trust_env = False  # 不读取 HTTP_PROXY / HTTPS_PROXY 等环境变量
+
+
 def search_omdb_by_id(imdb_id: str):
     """通过 IMDb ID 直接查询 OMDb API，获取电影详情"""
     if not imdb_id:
@@ -312,7 +317,7 @@ def search_omdb_by_id(imdb_id: str):
             'i': imdb_id,
             'plot': 'full'
         }
-        resp = requests.get(OMDB_BASE_URL, params=params, timeout=10)
+        resp = _omdb_session.get(OMDB_BASE_URL, params=params, timeout=15)
         data = resp.json()
         if data.get('Response') == 'True':
             return data
@@ -383,28 +388,30 @@ def search_omdb(movie_name):
         print(f"Using API key: {OMDB_API_KEY[:4]}...")
         
         try:
-            # 尝试使用真实API
+            # 尝试使用真实API（使用专用 Session，禁用系统代理）
             search_params = {
                 'apikey': OMDB_API_KEY,
                 's': movie_name,
                 'type': 'movie'
             }
-            
-            search_response = requests.get(OMDB_BASE_URL, params=search_params, timeout=10)
+
+            search_response = _omdb_session.get(OMDB_BASE_URL, params=search_params, timeout=15)
             search_data = search_response.json()
-            
+
             if search_data.get('Response') == 'True' and search_data.get('Search'):
                 # 获取第一个搜索结果的详细信息
                 imdb_id = search_data['Search'][0]['imdbID']
-                
+
                 detail_params = {
                     'apikey': OMDB_API_KEY,
                     'i': imdb_id,
                     'plot': 'full'
                 }
-                
-                detail_response = requests.get(OMDB_BASE_URL, params=detail_params, timeout=10)
+
+                detail_response = _omdb_session.get(OMDB_BASE_URL, params=detail_params, timeout=15)
                 return detail_response.json()
+            else:
+                print(f"OMDb search no result: {search_data.get('Error', 'unknown')}")
         except Exception as e:
             print(f"OMDb API error: {str(e)}")
     
