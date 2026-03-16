@@ -9,6 +9,7 @@ from config import Config, OMDB_API_KEY
 from douban_movie_scraper import DoubanMovieScraper
 from movie_translator import get_omdb_name, get_douban_name
 from rt_scraper import RTScraper
+from imdb_scraper import IMDbRatingScraper
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -261,11 +262,23 @@ def get_movie_data(movie_name):
     }
 
     # IMDb评分
+    imdb_id_for_dist = omdb_data.get('imdbID', '')
     if omdb_data.get('imdbRating') and omdb_data.get('imdbRating') != 'N/A':
-        movie_info['imdb'] = {
+        imdb_entry = {
             'score': omdb_data.get('imdbRating'),
             'votes': parse_votes(omdb_data.get('imdbVotes', '0'))
         }
+        # 附加 IMDb 评分分布
+        if imdb_id_for_dist:
+            try:
+                imdb_scraper_obj = IMDbRatingScraper()
+                imdb_dist = imdb_scraper_obj.get_rating_distribution(imdb_id_for_dist)
+                if imdb_dist:
+                    imdb_entry['rating_distribution'] = imdb_dist
+                    print(f"[IMDb] 获取到评分分布，共 {len(imdb_dist)} 段")
+            except Exception as e:
+                print(f"[IMDb] 获取评分分布失败: {e}")
+        movie_info['imdb'] = imdb_entry
 
     # 烂番茄评分（OMDb 专业分 + RT 网站抓取观众分）
     rt_data = get_rotten_tomatoes_scores(omdb_data, omdb_search_name,
@@ -461,7 +474,7 @@ def get_rotten_tomatoes_scores(omdb_data, movie_name, year=None):
     return rt_data if rt_data else None
 
 def get_douban_rating(search_name, original_name, imdb_id=None):
-    """获取豆瓣评分（仅返回分数和票数）
+    """获取豆瓣评分（分数、票数及评分分布）
     
     Args:
         search_name: 用于豆瓣搜索的名称（优先用中文）
@@ -478,13 +491,19 @@ def get_douban_rating(search_name, original_name, imdb_id=None):
             candidates.append(original_name)
 
         for name in candidates:
-            rating_info = scraper.get_movie_rating_only(name)
-            print(f"Douban rating for '{name}': {rating_info}")
-            if rating_info and rating_info.get('score', 0) > 0:
-                return {
-                    'score': str(rating_info['score']),
-                    'votes': rating_info['votes']
+            # 使用 search_movie 获取完整信息（含评分分布）
+            movie_info = scraper.search_movie(name)
+            if movie_info and movie_info.get('rating', 0) > 0:
+                result = {
+                    'score': str(movie_info['rating']),
+                    'votes': movie_info.get('votes', 0)
                 }
+                # 附加评分分布（若有）
+                dist = movie_info.get('rating_distribution', {})
+                if dist:
+                    result['rating_distribution'] = dist
+                    print(f"[Douban] 获取到评分分布: {dist}")
+                return result
 
         return None
 

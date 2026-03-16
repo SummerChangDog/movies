@@ -19,10 +19,14 @@ const moviePlot = document.getElementById('moviePlot');
 const doubanScore = document.getElementById('doubanScore');
 const doubanVotes = document.getElementById('doubanVotes');
 const doubanStars = document.getElementById('doubanStars');
+const doubanDistribution = document.getElementById('doubanDistribution');
+const doubanDistBars = document.getElementById('doubanDistBars');
 
 const imdbScore = document.getElementById('imdbScore');
 const imdbVotes = document.getElementById('imdbVotes');
 const imdbStars = document.getElementById('imdbStars');
+const imdbDistribution = document.getElementById('imdbDistribution');
+const imdbDistBars = document.getElementById('imdbDistBars');
 
 const rtCriticScore = document.getElementById('rtCriticScore');
 const rtAudienceScore = document.getElementById('rtAudienceScore');
@@ -117,10 +121,17 @@ function displayResults(data) {
         doubanScore.textContent = data.douban.score || '-';
         doubanVotes.textContent = formatNumber(data.douban.votes) || '-';
         doubanStars.innerHTML = createStars(data.douban.score);
+        // 评分分布
+        if (data.douban.rating_distribution && Object.keys(data.douban.rating_distribution).length > 0) {
+            renderDoubanDistribution(data.douban.rating_distribution);
+        } else {
+            doubanDistribution.classList.add('hidden');
+        }
     } else {
         doubanScore.textContent = '-';
         doubanVotes.textContent = '-';
         doubanStars.innerHTML = '';
+        doubanDistribution.classList.add('hidden');
     }
     
     // IMDb评分
@@ -128,10 +139,17 @@ function displayResults(data) {
         imdbScore.textContent = data.imdb.score || '-';
         imdbVotes.textContent = formatNumber(data.imdb.votes) || '-';
         imdbStars.innerHTML = createStars(data.imdb.score);
+        // 评分分布
+        if (data.imdb.rating_distribution && Object.keys(data.imdb.rating_distribution).length > 0) {
+            renderIMDbDistribution(data.imdb.rating_distribution);
+        } else {
+            imdbDistribution.classList.add('hidden');
+        }
     } else {
         imdbScore.textContent = '-';
         imdbVotes.textContent = '-';
         imdbStars.innerHTML = '';
+        imdbDistribution.classList.add('hidden');
     }
     
     // 烂番茄评分
@@ -229,6 +247,80 @@ function showResults() {
 
 function hideResults() {
     results.classList.add('hidden');
+}
+
+// ---- 评分分布渲染 ----
+
+/**
+ * 渲染豆瓣评分分布（5星→1星，百分比格式）
+ * dist 格式: { '5星': 45.2, '4星': 32.1, '3星': 15.0, '2星': 5.0, '1星': 2.7 }
+ */
+function renderDoubanDistribution(dist) {
+    // 固定顺序：5星 → 1星
+    const order = ['5星', '4星', '3星', '2星', '1星'];
+    const maxPct = Math.max(...order.map(k => dist[k] || 0));
+
+    doubanDistBars.innerHTML = '';
+    order.forEach(label => {
+        const pct = dist[label] || 0;
+        const barWidth = maxPct > 0 ? (pct / maxPct * 100).toFixed(1) : 0;
+        const row = document.createElement('div');
+        row.className = 'dist-row';
+        row.innerHTML = `
+            <span class="dist-label">${label}</span>
+            <div class="dist-bar-track">
+                <div class="dist-bar-fill" style="width: 0%"
+                     data-target="${barWidth}%"></div>
+            </div>
+            <span class="dist-percent">${pct.toFixed(1)}%</span>
+        `;
+        doubanDistBars.appendChild(row);
+    });
+
+    doubanDistribution.classList.remove('hidden');
+    // 延迟触发动画
+    requestAnimationFrame(() => {
+        doubanDistBars.querySelectorAll('.dist-bar-fill').forEach(el => {
+            el.style.width = el.dataset.target;
+        });
+    });
+}
+
+/**
+ * 渲染 IMDb 评分分布（10星→1星，含票数和百分比）
+ * dist 格式: { '10': {votes: N, percent: P}, '9': {...}, ... }
+ */
+function renderIMDbDistribution(dist) {
+    const maxPct = Math.max(...Object.values(dist).map(v => v.percent || 0));
+
+    imdbDistBars.innerHTML = '';
+    // 从10星到1星倒序显示
+    for (let star = 10; star >= 1; star--) {
+        const key = String(star);
+        const info = dist[key] || { votes: 0, percent: 0 };
+        const pct = info.percent || 0;
+        const barWidth = maxPct > 0 ? (pct / maxPct * 100).toFixed(1) : 0;
+
+        const row = document.createElement('div');
+        row.className = 'dist-row';
+        row.innerHTML = `
+            <span class="dist-label">${star}★</span>
+            <div class="dist-bar-track">
+                <div class="dist-bar-fill" style="width: 0%"
+                     data-target="${barWidth}%"></div>
+            </div>
+            <span class="dist-percent">${pct.toFixed(1)}%</span>
+        `;
+        imdbDistBars.appendChild(row);
+    }
+
+    imdbDistribution.classList.remove('hidden');
+    // 延迟触发动画
+    requestAnimationFrame(() => {
+        imdbDistBars.querySelectorAll('.dist-bar-fill').forEach(el => {
+            el.style.width = el.dataset.target;
+        });
+    });
 }
 
 // 初始化

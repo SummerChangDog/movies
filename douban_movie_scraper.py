@@ -251,6 +251,22 @@ class DoubanMovieScraper:
             summary_elem = soup.find('span', property='v:summary')
             movie_info['summary'] = summary_elem.get_text(strip=True) if summary_elem else ''
 
+            # 评分分布（5星→1星的百分比）
+            rating_per_elems = soup.find_all('span', class_='rating_per')
+            if len(rating_per_elems) == 5:
+                # 豆瓣页面顺序：5星、4星、3星、2星、1星
+                distribution = {}
+                labels = ['5星', '4星', '3星', '2星', '1星']
+                for i, elem in enumerate(rating_per_elems):
+                    pct_text = elem.get_text(strip=True).replace('%', '')
+                    try:
+                        distribution[labels[i]] = float(pct_text)
+                    except ValueError:
+                        distribution[labels[i]] = 0.0
+                movie_info['rating_distribution'] = distribution
+            else:
+                movie_info['rating_distribution'] = {}
+
             # 海报
             poster_elem = soup.find('img', rel='v:image')
             movie_info['poster'] = poster_elem.get('src') if poster_elem else ''

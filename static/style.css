@@ -494,6 +494,75 @@ footer i.fa-heart {
     }
 }
 
+/* ---- 评分分布条形图 ---- */
+.rating-distribution {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--light-bg);
+}
+
+.distribution-title {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 10px;
+}
+
+.dist-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.dist-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+}
+
+.dist-label {
+    flex: 0 0 28px;
+    text-align: right;
+    color: var(--text-light);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.dist-bar-track {
+    flex: 1;
+    height: 8px;
+    background: var(--light-bg);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.dist-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    min-width: 2px;
+}
+
+/* 豆瓣条形图颜色 */
+.rating-card.douban .dist-bar-fill {
+    background: linear-gradient(90deg, #00a618, #00d420);
+}
+
+/* IMDb条形图颜色 */
+.rating-card.imdb .dist-bar-fill {
+    background: linear-gradient(90deg, #d4a000, #F5C518);
+}
+
+.dist-percent {
+    flex: 0 0 38px;
+    text-align: left;
+    color: var(--text-light);
+    font-size: 0.75rem;
+}
+
 /* 工具类 */
 .hidden {
     display: none !important;
