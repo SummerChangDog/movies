@@ -14,6 +14,12 @@ OMDB_API_KEY = os.getenv('OMDB_API_KEY', '')
 # 注意：豆瓣API需要申请，目前使用模拟数据
 DOUBAN_API_KEY = os.getenv('DOUBAN_API_KEY', '')
 
+# 豆瓣 Cookie 配置（用于绕过豆瓣登录验证）
+# 从浏览器登录豆瓣后，打开开发者工具 → Application → Cookies → douban.com
+# 复制 bid 和 dbcl2 的值填入下方
+DOUBAN_COOKIE_BID    = os.getenv('DOUBAN_COOKIE_BID', '')
+DOUBAN_COOKIE_DBCL2  = os.getenv('DOUBAN_COOKIE_DBCL2', '')
+
 # 烂番茄API说明
 # 烂番茄评分通过OMDb API获取，无需单独的API密钥
 # OMDb API返回的数据中包含了烂番茄的专业评分(Tomatometer)

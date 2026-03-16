@@ -5,7 +5,7 @@ import os
 from datetime import datetime, timedelta
 import json
 from urllib.parse import quote, unquote
-from config import Config, OMDB_API_KEY
+from config import Config, OMDB_API_KEY, DOUBAN_COOKIE_BID, DOUBAN_COOKIE_DBCL2
 from douban_movie_scraper import DoubanMovieScraper
 from movie_translator import get_omdb_name, get_douban_name
 from rt_scraper import RTScraper
@@ -104,6 +104,9 @@ def search_movie():
         if not movie_data:
             return jsonify({'error': '未找到该电影'}), 404
         
+        # 注入豆瓣 Cookie 配置状态（供前端判断是否显示配置提示）
+        movie_data['_douban_cookie_configured'] = bool(DOUBAN_COOKIE_DBCL2)
+
         # 保存到缓存
         save_to_cache(cache_file, movie_data)
         
@@ -294,7 +297,7 @@ def get_movie_data(movie_name):
     # ---- 海报回退：若 OMDb 无海报，尝试从豆瓣获取 ----
     if not omdb_poster:
         try:
-            scraper = DoubanMovieScraper(delay_enable=True)
+            scraper = _make_douban_scraper(delay_enable=True)
             # 按候选顺序搜索：中文名优先，再尝试原始输入
             poster_candidates = [douban_search_name]
             if movie_name != douban_search_name:
@@ -477,6 +480,16 @@ def get_rotten_tomatoes_scores(omdb_data, movie_name, year=None):
 
     return rt_data if rt_data else None
 
+def _make_douban_scraper(delay_enable=True) -> DoubanMovieScraper:
+    """创建配置好 Cookie 的豆瓣爬虫实例（全局统一入口）"""
+    scraper = DoubanMovieScraper(
+        delay_enable=delay_enable,
+        bid=DOUBAN_COOKIE_BID,
+        dbcl2=DOUBAN_COOKIE_DBCL2,
+    )
+    return scraper
+
+
 def get_douban_rating(search_name, original_name, imdb_id=None):
     """获取豆瓣评分（分数、票数及评分分布）
     
@@ -487,7 +500,7 @@ def get_douban_rating(search_name, original_name, imdb_id=None):
     """
     try:
         print(f"Getting Douban rating for: {search_name} (original: {original_name})")
-        scraper = DoubanMovieScraper(delay_enable=True)
+        scraper = _make_douban_scraper(delay_enable=True)
 
         # 构建搜索候选列表：优先中文名，再原始名，再英文名（若不同）
         candidates = [search_name]
@@ -524,7 +537,7 @@ def get_douban_full_info(search_name, original_name):
         original_name: 用户原始输入
     """
     try:
-        scraper = DoubanMovieScraper(delay_enable=True)
+        scraper = _make_douban_scraper(delay_enable=True)
         candidates = [search_name]
         if original_name and original_name != search_name:
             candidates.append(original_name)

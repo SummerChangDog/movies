@@ -601,6 +601,14 @@ footer i.fa-heart {
     font-size: 0.75rem;
 }
 
+/* 豆瓣未配置 Cookie 提示文字 */
+.douban-tip {
+    font-size: 11px;
+    color: #e67e22;
+    cursor: help;
+    white-space: nowrap;
+}
+
 /* 工具类 */
 .hidden {
     display: none !important;

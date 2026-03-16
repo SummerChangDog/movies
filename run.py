@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 启动脚本 — 在运行 Flask 应用前检查并收集必要的 API Key。
 
@@ -57,10 +58,10 @@ def _load_dotenv_if_exists():
         pass
 
 
-def _prompt_key(env_name: str, display_name: str, hint: str, is_secret: bool) -> str:
+def _prompt_key(env_name, display_name, hint, is_secret):
     """提示用户输入单个 Key，返回输入值（空字符串表示跳过/使用默认）。"""
-    print(f"\n  📌  {display_name}")
-    print(f"      提示：{hint}")
+    print(f"\n  [*]  {display_name}")
+    print(f"       提示：{hint}")
     prompt_text = f"  请输入 {env_name}："
     try:
         if is_secret:
@@ -88,7 +89,7 @@ def collect_api_keys():
 
     if missing:
         print("\n" + "=" * 60)
-        print("  🔑  需要输入以下 API Key 才能启动应用")
+        print("  [KEY]  需要输入以下 API Key 才能启动应用")
         print("  （已在环境变量或 .env 文件中配置的项将自动跳过）")
         print("=" * 60)
 
@@ -99,7 +100,7 @@ def collect_api_keys():
                     os.environ[env_name] = value
                     break
                 else:
-                    print(f"  ⚠️   {env_name} 不能为空，请重新输入。")
+                    print(f"  [!]  {env_name} 不能为空，请重新输入。")
 
     # 可选 Key
     for env_name, display_name, hint, is_secret in OPTIONAL_KEYS:
@@ -108,12 +109,11 @@ def collect_api_keys():
             if value:
                 os.environ[env_name] = value
             else:
-                # 使用默认值
                 default = "gpt-4o-mini"
                 os.environ.setdefault(env_name, default)
-                print(f"  ℹ️   {env_name} 使用默认值：{default}")
+                print(f"  [i]  {env_name} 使用默认值：{default}")
 
-    print("\n  ✅  所有 API Key 已就绪，正在启动应用...\n")
+    print("\n  [OK]  所有 API Key 已就绪，正在启动应用...\n")
 
 
 def main():
@@ -128,7 +128,7 @@ def main():
     port = Config.PORT
     debug = Config.DEBUG
 
-    print(f"  🚀  Flask 应用启动中  →  http://{host}:{port}")
+    print(f"  [>>]  Flask 应用启动中  ->  http://{host}:{port}")
     app.run(debug=debug, host=host, port=port)
 
 

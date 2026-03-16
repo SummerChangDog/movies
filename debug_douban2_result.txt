@@ -1,0 +1,33 @@
+=== TEST1: Session warmup then search API ===
+  homepage: 403, cookies: ['bid']
+  suggest API: 403
+  response[:200]: <html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>豆瓣 - 登录跳转页</title>
+    <style
+
+=== TEST2: Frodo mobile API ===
+  status: 400
+  response[:300]: {"msg": "apikey is required(36.112.3.57). Please contact bd-team@douban.com for authorized access.", "code": 131, "request": "GET \/v2\/search\/movie", "localized_message": ""}
+
+=== TEST3: Direct detail page with warmed session ===
+  status: 403, length: 993
+  response[:300]: <html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>豆瓣 - 登录跳转页</title>
+    <style type="text/css">
+        body{font-family:Arial,Helvetica,sans-serif;font-size:14px;}
+        h1{fo
+
+=== TEST4: Direct detail page without warmup ===
+  status: 403, length: 993
+  response[:200]: <html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>豆瓣 - 登录跳转页</title>
+    <style

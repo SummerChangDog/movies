@@ -1,6 +1,7 @@
 """
 豆瓣电影数据爬虫
 基于网页爬取，无需API密钥
+使用 requests.Session + 登录 Cookie 绕过豆瓣 sec.douban.com 安全网关
 使用 requests.Session 处理豆瓣 PoW（工作量证明）反爬挑战
 """
 import re
@@ -28,15 +29,19 @@ USER_AGENTS = [
 
 
 class DoubanMovieScraper:
-    """豆瓣电影爬虫（支持自动绕过 PoW 验证）"""
+    """豆瓣电影爬虫（支持 Cookie 注入绕过登录验证 + PoW 挑战）"""
 
-    def __init__(self, delay_enable=True):
+    def __init__(self, delay_enable=True, bid='', dbcl2=''):
         """
         初始化爬虫
         :param delay_enable: 是否启用随机延迟
+        :param bid: 豆瓣 bid Cookie（从浏览器获取）
+        :param dbcl2: 豆瓣 dbcl2 登录 Cookie（从浏览器获取）
         """
         self.delay_enable = delay_enable
         self._user_agent = random.choice(USER_AGENTS)
+        self.cookie_available = bool(dbcl2)  # 是否有登录 Cookie
+
         # 使用 Session 维护 Cookie，使 PoW 验证状态持久化
         self.session = requests.Session()
         self.session.headers.update({
@@ -45,6 +50,16 @@ class DoubanMovieScraper:
             'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
             'Connection': 'keep-alive',
         })
+
+        # 注入登录 Cookie（如有配置）
+        if bid:
+            self.session.cookies.set('bid', bid, domain='.douban.com')
+            print(f"[DoubanScraper] 已注入 bid cookie")
+        if dbcl2:
+            self.session.cookies.set('dbcl2', dbcl2, domain='.douban.com')
+            print(f"[DoubanScraper] 已注入 dbcl2 登录 cookie，认证模式已启用")
+        else:
+            print(f"[DoubanScraper] 未配置 dbcl2 cookie，豆瓣数据可能无法获取（需要登录）")
 
     def random_delay(self):
         """随机延迟，避免请求过快"""
@@ -75,7 +90,14 @@ class DoubanMovieScraper:
         :return: 页面 HTML 字符串，失败返回 None
         """
         try:
-            resp = self.session.get(url, timeout=15)
+            resp = self.session.get(url, timeout=15, allow_redirects=True)
+
+            # 检测登录跳转（HTTP 403 + 豆瓣登录页）
+            if resp.status_code == 403 or '登录跳转页' in resp.text or 'sec.douban.com' in resp.url:
+                print(f"[DoubanScraper] 被重定向到登录页（{resp.status_code}），"
+                      f"需要在 .env 中配置 DOUBAN_COOKIE_BID 和 DOUBAN_COOKIE_DBCL2")
+                return None
+
             resp.raise_for_status()
 
             # 检测是否触发了 PoW 挑战

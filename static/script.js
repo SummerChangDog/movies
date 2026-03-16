@@ -134,6 +134,14 @@ function displayResults(data) {
         doubanVotes.textContent = '-';
         doubanStars.innerHTML = '';
         doubanDistribution.classList.add('hidden');
+
+        // 若未配置豆瓣 Cookie，在评分区域显示友好提示
+        if (!data._douban_cookie_configured) {
+            doubanVotes.innerHTML =
+                '<span class="douban-tip" title="在 .env 中配置 DOUBAN_COOKIE_BID 和 DOUBAN_COOKIE_DBCL2 即可启用">' +
+                '⚠️ 需配置 Cookie' +
+                '</span>';
+        }
     }
     
     // IMDb评分

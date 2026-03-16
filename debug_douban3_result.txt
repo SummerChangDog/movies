@@ -1,0 +1,33 @@
+=== PLAN-A: Full Chrome fingerprint headers ===
+  homepage status: 403, cookies: ['bid']
+  suggest API status: 403
+  suggest API response[:300]: <html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>豆瓣 - 登录跳转页</title>
+    <style type="text/css">
+        body{font-family:Arial,Helvetica,sans-serif;font-size:14px;}
+        h1{fo
+
+=== PLAN-B: Mobile site m.douban.com ===
+  mobile detail status: 403, length: 997, url: https://sec.douban.com/b?r=https%3A%2F%2Fm.douban.com%2Fmovie%2Fsubject%2F1292052%2F
+  response[:200]: <html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>豆瓣 - 登录跳转页</title>
+    <style
+
+=== PLAN-C: Douban API v2 subject direct ===
+  old API v2 status: 403
+  response[:300]: {"msg":"invalid_apikey, Please contact bd-team@douban.com for authorized access.","code":104,"request":"GET \/v2\/movie\/subject\/1292052"}
+
+=== PLAN-D: Referer spoofing with full session ===
+  status: 403, length: 993
+  response[:200]: <html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>豆瓣 - 登录跳转页</title>
+    <style
