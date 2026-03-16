@@ -254,6 +254,12 @@ class DoubanMovieScraper:
             poster_elem = soup.find('img', rel='v:image')
             movie_info['poster'] = poster_elem.get('src') if poster_elem else ''
 
+            # IMDb ID（从豆瓣页面的 IMDb 外链提取）
+            imdb_link = re.search(r'https?://(?:www\.)?imdb\.com/title/(tt\d+)', content)
+            movie_info['imdb_id'] = imdb_link.group(1) if imdb_link else ''
+            if movie_info['imdb_id']:
+                print(f"[DoubanScraper] 提取到 IMDb ID: {movie_info['imdb_id']}")
+
             # 豆瓣链接
             movie_info['douban_url'] = url
             movie_info['douban_id'] = movie_id

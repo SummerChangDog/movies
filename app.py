@@ -138,19 +138,24 @@ def get_movie_data(movie_name):
             # 用豆瓣搜索结果中的电影信息构建基本数据
             douban_full = get_douban_full_info(douban_search_name, movie_name)
 
-            # 从豆瓣合并标题（如"闪灵 The Shining"）中提取英文名，用于 OMDb/RT 查询
+            # 优先用豆瓣页面中提取的 IMDb ID 直接查询 OMDb，最准确
             english_title = None
-            if douban_full:
-                combined = douban_full.get('title', '')
-                en_match = _re.search(r'[A-Za-z][A-Za-z0-9\s:\',!?&\-]{2,}', combined)
-                if en_match:
-                    english_title = en_match.group(0).strip()
-                    print(f"从豆瓣标题提取英文名: {english_title}")
-
-            # 用英文名重试 OMDb（可能获取到 IMDb 评分）
             omdb_retry = None
-            if english_title:
-                omdb_retry = search_omdb(english_title)
+            if douban_full:
+                # 方法一：豆瓣页面中直接含有 IMDb 链接
+                imdb_id_from_douban = douban_full.get('imdb_id', '')
+                if imdb_id_from_douban:
+                    print(f"使用豆瓣提取的 IMDb ID 直接查询 OMDb: {imdb_id_from_douban}")
+                    omdb_retry = search_omdb_by_id(imdb_id_from_douban)
+
+                # 方法二：从豆瓣合并标题（如"简爱 Jane Eyre"）中提取英文名
+                if not omdb_retry:
+                    combined = douban_full.get('title', '')
+                    en_match = _re.search(r'[A-Za-z][A-Za-z0-9\s:\',!?&\-]{2,}', combined)
+                    if en_match:
+                        english_title = en_match.group(0).strip()
+                        print(f"从豆瓣标题提取英文名: {english_title}")
+                        omdb_retry = search_omdb(english_title)
 
             # 确定海报：优先豆瓣，若无则回退到 OMDb 重试结果
             douban_poster = (douban_full.get('poster', '') if douban_full else '') or ''
@@ -188,10 +193,17 @@ def get_movie_data(movie_name):
                     }
 
             # 用英文名抓取 RT 评分（传入年份以提高匹配准确性）
-            if english_title:
+            # 若通过 IMDb ID 获得了 omdb_retry 但 english_title 为空，
+            # 则从 OMDb 返回数据中取 Title 字段作为英文名
+            rt_english_title = english_title
+            if not rt_english_title and omdb_retry:
+                rt_english_title = omdb_retry.get('Title', '')
+                if rt_english_title:
+                    print(f"[RT] 使用 OMDb 返回的英文标题抓取 RT 评分: {rt_english_title}")
+            if rt_english_title:
                 rt_source = omdb_retry if omdb_retry else {}
                 douban_year = douban_full.get('year', '') if douban_full else ''
-                rt_data = get_rotten_tomatoes_scores(rt_source, english_title,
+                rt_data = get_rotten_tomatoes_scores(rt_source, rt_english_title,
                                                      year=douban_year)
                 if rt_data:
                     movie_info['rottenTomatoes'] = rt_data
@@ -255,6 +267,30 @@ def get_movie_data(movie_name):
             print(f"[Poster] 获取豆瓣海报失败: {e}")
 
     return movie_info
+
+def search_omdb_by_id(imdb_id: str):
+    """通过 IMDb ID 直接查询 OMDb API，获取电影详情"""
+    if not imdb_id:
+        return None
+    if not (OMDB_API_KEY and OMDB_API_KEY != 'your-api-key-here'):
+        print(f"[OMDb] 无有效 API Key，跳过 IMDb ID 查询: {imdb_id}")
+        return None
+    try:
+        print(f"[OMDb] 通过 IMDb ID 查询: {imdb_id}")
+        params = {
+            'apikey': OMDB_API_KEY,
+            'i': imdb_id,
+            'plot': 'full'
+        }
+        resp = requests.get(OMDB_BASE_URL, params=params, timeout=10)
+        data = resp.json()
+        if data.get('Response') == 'True':
+            return data
+        print(f"[OMDb] IMDb ID 查询无结果: {data.get('Error', '')}")
+    except Exception as e:
+        print(f"[OMDb] IMDb ID 查询出错: {e}")
+    return None
+
 
 def search_omdb(movie_name):
     """通过OMDb API搜索电影"""
