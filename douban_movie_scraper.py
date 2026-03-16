@@ -139,18 +139,19 @@ class DoubanMovieScraper:
         return self._get_movie_id_from_search_page(movie_name)
 
     def _get_movie_id_from_api(self, movie_name):
-        """使用搜索建议 JSON API 获取电影ID"""
+        """使用搜索建议 JSON API 获取电影ID，同时记录英文副标题"""
         try:
             url = f"{DOUBAN_MOVIE_SEARCH_URL}?q={requests.utils.quote(movie_name)}"
             print(f"[DoubanScraper] API URL: {url}")
             resp = self.session.get(url, timeout=10)
             resp.raise_for_status()
             data = resp.json()
-            print(f"[DoubanScraper] API response: {data}")
             for item in data:
                 if item.get('type') == 'movie':
                     movie_id = item.get('id')
-                    print(f"[DoubanScraper] Found movie ID from API: {movie_id}")
+                    # sub_title 通常是英文原名，如 'Jane Eyre'
+                    self._last_subtitle = item.get('sub_title', '')
+                    print(f"[DoubanScraper] Found movie ID from API: {movie_id}, sub_title: '{self._last_subtitle}'")
                     return movie_id
         except Exception as e:
             print(f"[DoubanScraper] API error: {e}")
@@ -278,13 +279,22 @@ class DoubanMovieScraper:
         """
         搜索电影并返回详情
         :param movie_name: 电影名称
-        :return: 电影信息字典或 None
+        :return: 电影信息字典或 None（含 subtitle 字段，为豆瓣 API 返回的英文原名）
         """
         try:
+            self._last_subtitle = ''  # 重置
             movie_id = self.get_movie_id(movie_name)
             if not movie_id:
                 return None
-            return self.get_movie_details(movie_id)
+            details = self.get_movie_details(movie_id)
+            if details is not None:
+                # 将 suggest API 的英文副标题注入详情，供上层直接使用
+                if self._last_subtitle and not details.get('imdb_id'):
+                    details['subtitle'] = self._last_subtitle
+                    print(f"[DoubanScraper] 注入英文副标题: '{self._last_subtitle}'")
+                else:
+                    details.setdefault('subtitle', self._last_subtitle)
+            return details
         except Exception as e:
             print(f"[DoubanScraper] 搜索电影时出错: {e}")
             return None

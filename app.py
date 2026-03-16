@@ -138,24 +138,54 @@ def get_movie_data(movie_name):
             # 用豆瓣搜索结果中的电影信息构建基本数据
             douban_full = get_douban_full_info(douban_search_name, movie_name)
 
-            # 优先用豆瓣页面中提取的 IMDb ID 直接查询 OMDb，最准确
+            # 按优先级获取英文名并查询 OMDb：
+            #   方法一：豆瓣详情页中直接含有 IMDb 链接（最准确，用 ID 直查）
+            #   方法二：豆瓣 suggest API 的 sub_title 字段（如 'Jane Eyre'）
+            #   方法三：从豆瓣合并标题（如"简爱 Jane Eyre"）正则提取英文名
             english_title = None
             omdb_retry = None
             if douban_full:
-                # 方法一：豆瓣页面中直接含有 IMDb 链接
                 imdb_id_from_douban = douban_full.get('imdb_id', '')
-                if imdb_id_from_douban:
-                    print(f"使用豆瓣提取的 IMDb ID 直接查询 OMDb: {imdb_id_from_douban}")
-                    omdb_retry = search_omdb_by_id(imdb_id_from_douban)
+                subtitle_from_douban = douban_full.get('subtitle', '')
 
-                # 方法二：从豆瓣合并标题（如"简爱 Jane Eyre"）中提取英文名
+                print(f"[OMDb查询] imdb_id='{imdb_id_from_douban}', subtitle='{subtitle_from_douban}', title='{douban_full.get('title','')}'")
+
+                # 方法一：IMDb ID 直查
+                if imdb_id_from_douban:
+                    print(f"[OMDb] 方法一：用 IMDb ID '{imdb_id_from_douban}' 直接查询")
+                    omdb_retry = search_omdb_by_id(imdb_id_from_douban)
+                    if omdb_retry:
+                        english_title = omdb_retry.get('Title', '')
+                        print(f"[OMDb] 方法一成功，标题={english_title}, IMDb={omdb_retry.get('imdbRating')}")
+                    else:
+                        print(f"[OMDb] 方法一失败（无有效 API Key 或查询出错）")
+
+                # 方法二：豆瓣 suggest subtitle（英文原名）
+                if not omdb_retry and subtitle_from_douban:
+                    english_title = subtitle_from_douban
+                    print(f"[OMDb] 方法二：用豆瓣 subtitle '{english_title}' 搜索")
+                    omdb_retry = search_omdb(english_title)
+                    if omdb_retry:
+                        print(f"[OMDb] 方法二成功，标题={omdb_retry.get('Title')}, IMDb={omdb_retry.get('imdbRating')}")
+                    else:
+                        print(f"[OMDb] 方法二失败（未找到 '{english_title}'）")
+
+                # 方法三：从豆瓣合并标题正则提取英文名
                 if not omdb_retry:
                     combined = douban_full.get('title', '')
                     en_match = _re.search(r'[A-Za-z][A-Za-z0-9\s:\',!?&\-]{2,}', combined)
                     if en_match:
                         english_title = en_match.group(0).strip()
-                        print(f"从豆瓣标题提取英文名: {english_title}")
+                        print(f"[OMDb] 方法三：从豆瓣标题提取英文名 '{english_title}'")
                         omdb_retry = search_omdb(english_title)
+                        if omdb_retry:
+                            print(f"[OMDb] 方法三成功，标题={omdb_retry.get('Title')}, IMDb={omdb_retry.get('imdbRating')}")
+                        else:
+                            print(f"[OMDb] 方法三失败，三种方法均无法获取 OMDb 数据")
+                    else:
+                        print(f"[OMDb] 方法三：豆瓣标题 '{combined}' 无英文名可提取")
+            else:
+                print(f"[OMDb] 豆瓣详情获取失败，无法进行 OMDb 查询")
 
             # 确定海报：优先豆瓣，若无则回退到 OMDb 重试结果
             douban_poster = (douban_full.get('poster', '') if douban_full else '') or ''
